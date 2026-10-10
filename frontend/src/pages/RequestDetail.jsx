@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import api, { FINAL, PAYMENT_METHODS, READY, STATUSES, errMsg, fieldErrors, fmt, fmtDate, peso, today } from '../api';
+import api, { FINAL, NEEDS_VERIFIED_PAYMENT, PAYMENT_METHODS, READY, REF_RULES, STATUSES, errMsg, fieldErrors, fmt, fmtDate, peso, refError, today } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import useSettings from '../useSettings';
 import { PaymentInstructions } from './student/NewRequest';
-import { Button, Card, CopyChip, Field, Icon, Notice, Row, Spinner, StatusBadge, inputCls } from '../components/ui';
+import { Avatar, Button, Card, CopyChip, Field, Icon, Notice, Row, Spinner, StatusBadge, inputCls } from '../components/ui';
 
 const FileLink = ({ url, label = 'Open file' }) =>
   url ? <a className="font-semibold text-brand-700 underline" href={url} target="_blank" rel="noreferrer">{label}</a> : 'None';
@@ -68,6 +68,9 @@ export default function RequestDetail() {
 
   const sendPayment = async (e) => {
     e.preventDefault(); setPayErr({});
+    // Check the reference format before sending (the API checks it again).
+    const refProblem = refError(pay.payment_method, pay.payment_reference);
+    if (refProblem) { setPayErr({ payment_reference: refProblem }); return toast(refProblem, 'error'); }
     const fd = new FormData();
     fd.append('payment_method', pay.payment_method);
     if (pay.payment_reference) fd.append('payment_reference', pay.payment_reference);
@@ -79,6 +82,8 @@ export default function RequestDetail() {
   };
 
   const canPay = !isAdmin && !final && req.payment_status !== 'Verified';
+  // Paid documents cannot be released (ready / completed) until the payment is verified; the API enforces this too.
+  const blockedByPayment = NEEDS_VERIFIED_PAYMENT.includes(status) && Number(req.amount) > 0 && req.payment_status !== 'Verified';
 
   return (
     <div className="space-y-6">
@@ -143,10 +148,23 @@ export default function RequestDetail() {
             <Row k="Amount to pay" v={peso(req.amount)} />
             <Row k="Reference no." v={req.payment_reference} />
             <Row k="Receipt / proof" v={<FileLink url={req.payment_proof_url} label="View receipt" />} />
+            {req.payment_submitted_at && <Row k="Details sent" v={fmt(req.payment_submitted_at)} />}
+            {req.payment_verified_at && <Row k="Verified" v={`${fmt(req.payment_verified_at)}${req.payment_verified_by ? ` by ${req.payment_verified_by}` : ''}`} />}
+
+            {!isAdmin && !final && (
+              <div className="mt-3">
+                {req.payment_status === 'Unpaid' && <Notice tone="warn" title="Payment needed">Pay {peso(req.amount)} then send your reference number or receipt below.</Notice>}
+                {req.payment_status === 'For Verification' && <Notice tone="info" title="Payment received">The admin is checking your payment. You will be notified once it is verified.</Notice>}
+                {req.payment_status === 'Verified' && <Notice tone="ok" title="Payment verified">Thank you! Your payment has been confirmed.</Notice>}
+              </div>
+            )}
+            {isAdmin && !final && !trashed && req.payment_status === 'Unpaid' && (
+              <div className="mt-3"><Notice tone="warn">The student has not sent any payment details yet, so there is nothing to verify.</Notice></div>
+            )}
 
             {isAdmin && !final && !trashed && (
               <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
-                <Button disabled={busy || req.payment_status === 'Verified'} onClick={() => run(() => api.patch(`${base}/${id}/payment`, { payment_status: 'Verified' }), 'Payment verified.')}>
+                <Button disabled={busy || req.payment_status !== 'For Verification'} onClick={() => run(() => api.patch(`${base}/${id}/payment`, { payment_status: 'Verified' }), 'Payment verified.')}>
                   <Icon name="check" size={16} />Verify payment
                 </Button>
                 <Button variant="dangerOutline" disabled={busy || req.payment_status === 'Unpaid'} onClick={() => run(() => api.patch(`${base}/${id}/payment`, { payment_status: 'Unpaid', remarks: remarks || undefined }), 'Marked as unpaid.')}>
@@ -165,7 +183,7 @@ export default function RequestDetail() {
                 </Field>
                 <PaymentInstructions method={pay.payment_method} s={settings} amount={req.amount} />
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="Payment reference no." error={payErr.payment_reference}><input className={inputCls} value={pay.payment_reference} onChange={(e) => setPay({ ...pay, payment_reference: e.target.value })} maxLength="80" /></Field>
+                  <Field label="Payment reference no." error={payErr.payment_reference} hint={REF_RULES[pay.payment_method].hint}><input className={inputCls} value={pay.payment_reference} onChange={(e) => setPay({ ...pay, payment_reference: e.target.value })} maxLength="80" inputMode={pay.payment_method === 'GCash' ? 'numeric' : 'text'} /></Field>
                   <Field label="Receipt / screenshot" error={payErr.payment_proof}><input type="file" accept=".pdf,.jpg,.jpeg,.png" className={inputCls} onChange={(e) => setPay({ ...pay, file: e.target.files[0] || null })} /></Field>
                 </div>
                 <Button type="submit" loading={busy}>Send payment details</Button>
@@ -193,7 +211,10 @@ export default function RequestDetail() {
                     <span className="text-xs text-slate-500">{fmt(h.created_at)}</span>
                   </div>
                   {h.remarks && <p className="mt-1 text-sm text-slate-700">{h.remarks}</p>}
-                  <p className="text-xs text-slate-400">by {h.by || 'system'}{h.role ? ` (${h.role === 'admin' ? 'admin' : 'student'})` : ''}</p>
+                  <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-400">
+                    {h.by && <Avatar user={{ name: h.by, avatar_url: h.by_avatar_url }} size={20} />}
+                    by {h.by || 'system'}{h.role ? ` (${h.role === 'admin' ? 'admin' : 'student'})` : ''}
+                  </p>
                 </li>
               ))}
             </ol>
@@ -203,6 +224,10 @@ export default function RequestDetail() {
         <div className="space-y-6">
           {isAdmin && (
             <Card title="Student">
+              <div className="mb-3 flex items-center gap-4 border-b border-slate-100 pb-4">
+                <Avatar user={req.student} size={72} className="ring-4 ring-brand-100" />
+                <div className="min-w-0"><div className="truncate font-semibold text-slate-900">{req.student?.name}</div><div className="text-xs text-slate-500">{req.student?.avatar_url ? 'Profile picture' : 'No profile picture yet'}</div></div>
+              </div>
               <Row k="Name" v={req.student?.name} />
               <Row k="Student ID" v={req.student?.student_number} />
               <Row k="Course" v={req.student?.course} />
@@ -223,6 +248,7 @@ export default function RequestDetail() {
                     </select>
                   </Field>
                 )}
+                {blockedByPayment && <Notice tone="warn">Verify the student's payment first — a paid document cannot be marked “{status}” before that.</Notice>}
                 {needsDate && (
                   <Field label="Pick-up date (required)" hint="The student is notified of this date.">
                     <input type="date" min={today()} className={inputCls} value={pickupDate} onChange={(e) => setPickupDate(e.target.value)} />
@@ -233,7 +259,7 @@ export default function RequestDetail() {
                 </Field>
                 {!final && (
                   <div className="flex flex-wrap gap-2">
-                    <Button loading={busy} disabled={!status} onClick={() => setTo(status, pickupDate)}>Update status</Button>
+                    <Button loading={busy} disabled={!status || blockedByPayment} onClick={() => setTo(status, pickupDate)}>Update status</Button>
                     {req.status === 'Pending' && <Button variant="secondary" disabled={busy} onClick={() => setTo('Approved')}>Approve</Button>}
                     <Button variant="dangerOutline" disabled={busy} onClick={() => setTo('Rejected')}>Reject</Button>
                   </div>

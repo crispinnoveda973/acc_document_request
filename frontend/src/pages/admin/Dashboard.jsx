@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import api, { READY, errMsg, fmt, fmtDate, peso } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { Card, Empty, Icon, Notice, PageHeader, Spinner, StatCard, StatusBadge } from '../../components/ui';
+import { Avatar, Card, Empty, Icon, Notice, PageHeader, Spinner, StatCard, StatusBadge } from '../../components/ui';
 
 const BAR = {
   Pending: 'bg-amber-400', 'Under Review': 'bg-sky-400', Approved: 'bg-emerald-400', Processing: 'bg-indigo-400',
@@ -48,9 +48,12 @@ export default function AdminDashboard() {
               {s.pending.map((r) => (
                 <li key={r.id}>
                   <Link to={`/requests/${r.id}`} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 hover:bg-slate-50">
-                    <div className="min-w-0">
-                      <div className="font-semibold text-slate-900">{r.document_type?.name} <span className="font-normal text-slate-500">· {r.copies} {r.copies > 1 ? 'copies' : 'copy'}</span></div>
-                      <div className="text-sm text-slate-500">{r.student?.name} · {r.student?.student_number}</div>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <Avatar user={r.student} size={40} />
+                      <div className="min-w-0">
+                        <div className="font-semibold text-slate-900">{r.document_type?.name} <span className="font-normal text-slate-500">· {r.copies} {r.copies > 1 ? 'copies' : 'copy'}</span></div>
+                        <div className="text-sm text-slate-500">{r.student?.name} · {r.student?.student_number}</div>
+                      </div>
                     </div>
                     <div className="text-right text-sm">
                       <StatusBadge status={r.payment_status} />
@@ -82,7 +85,7 @@ export default function AdminDashboard() {
               {s.ready.map((r) => (
                 <li key={r.id}>
                   <Link to={`/requests/${r.id}`} className="block px-5 py-3 hover:bg-slate-50">
-                    <div className="text-sm font-semibold text-slate-900">{r.student?.name}</div>
+                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-900"><Avatar user={r.student} size={24} />{r.student?.name}</div>
                     <div className="text-xs text-slate-500">{r.document_type?.name}</div>
                     <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-teal-700"><Icon name="calendar" size={13} />{fmtDate(r.pickup_date)}{r.pickup_by === 'representative' && ' · representative'}</div>
                   </Link>
@@ -100,7 +103,7 @@ export default function AdminDashboard() {
                 {s.recent.map((r) => (
                   <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50/60">
                     <td className="px-5 py-3"><Link className="font-mono text-xs font-semibold text-brand-700 underline" to={`/requests/${r.id}`}>{r.transaction_number}</Link></td>
-                    <td>{r.student?.name}</td><td>{r.document_type?.name}</td><td><StatusBadge status={r.status} /></td>
+                    <td><span className="flex items-center gap-2"><Avatar user={r.student} size={24} />{r.student?.name}</span></td><td>{r.document_type?.name}</td><td><StatusBadge status={r.status} /></td>
                     <td className="whitespace-nowrap pr-5 text-slate-500">{fmt(r.created_at)}</td>
                   </tr>
                 ))}

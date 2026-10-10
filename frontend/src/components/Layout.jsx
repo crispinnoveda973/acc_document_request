@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import api, { fmt } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { Icon, Logo } from './ui';
+import { Avatar, Icon, Logo } from './ui';
 
 function Bell() {
   const { user } = useAuth();
@@ -69,7 +69,7 @@ export default function Layout() {
 
   const isAdmin = user.role === 'admin';
   const links = isAdmin
-    ? [['/', 'Dashboard', 'home'], ['/requests', 'All Requests', 'file'], ['/document-types', 'Document Types', 'tag'], ['/how-to-claim', 'How to Claim', 'steps'], ['/settings', 'Site Settings', 'settings'], ['/about', 'About ACC', 'info'], ['/profile', 'My Profile', 'user']]
+    ? [['/', 'Dashboard', 'home'], ['/requests', 'All Requests', 'file'], ['/students', 'Students', 'users'], ['/document-types', 'Document Types', 'tag'], ['/how-to-claim', 'How to Claim', 'steps'], ['/settings', 'Site Settings', 'settings'], ['/about', 'About ACC', 'info'], ['/profile', 'My Profile', 'user']]
     : [['/', 'My Requests', 'home'], ['/new', 'New Request', 'plus'], ['/how-to-claim', 'How to Claim', 'steps'], ['/about', 'About ACC', 'info'], ['/profile', 'My Profile', 'user']];
 
   const cls = ({ isActive }) =>
@@ -91,7 +91,7 @@ export default function Layout() {
       </nav>
       <div className="border-t border-white/10 p-4">
         <div className="mb-3 flex items-center gap-3">
-          <span className="grid h-9 w-9 place-items-center rounded-full bg-gold-500 text-sm font-bold text-brand-900">{user.name[0]}</span>
+          <Link to="/profile" title="Change profile picture"><Avatar user={user} size={40} className="ring-2 ring-gold-400" /></Link>
           <div className="min-w-0 text-sm leading-tight">
             <div className="truncate font-semibold">{user.name}</div>
             <div className="text-xs text-white/60">{isAdmin ? 'Administrator' : 'Student'}</div>

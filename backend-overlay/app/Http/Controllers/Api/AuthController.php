@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -76,6 +77,34 @@ class AuthController extends Controller
         $user->update(['name' => strip_tags($d['name']), 'email' => $d['email']]);
         if ($user->student) {
             $user->student->update(collect($d)->only(['course', 'year_level', 'contact_number'])->all());
+        }
+        return response()->json(['user' => $user->fresh()->payload()]);
+    }
+
+    /** Upload or replace the logged-in user's profile picture (students and admins). */
+    public function updatePhoto(Request $r)
+    {
+        $r->validate(
+            ['photo' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:2048']],
+            ['photo.mimes' => 'The photo must be a JPG, PNG or WebP image.', 'photo.max' => 'The photo must not be larger than 2 MB.']
+        );
+
+        $user = $r->user();
+        $old = $user->profile_photo_path;
+        $user->update(['profile_photo_path' => $r->file('photo')->store('avatars', 'public')]);
+
+        // Remove the previous file only after the new one is saved, so a failed upload never leaves the user without a photo.
+        if ($old) Storage::disk('public')->delete($old);
+
+        return response()->json(['user' => $user->fresh()->payload()]);
+    }
+
+    public function deletePhoto(Request $r)
+    {
+        $user = $r->user();
+        if ($user->profile_photo_path) {
+            Storage::disk('public')->delete($user->profile_photo_path);
+            $user->update(['profile_photo_path' => null]);
         }
         return response()->json(['user' => $user->fresh()->payload()]);
     }

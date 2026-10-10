@@ -21,7 +21,7 @@ class StoreDocumentRequest extends FormRequest
             'attachment' => $file,
 
             'payment_method' => ['required', Rule::in(DocumentRequest::PAYMENT_METHODS)],
-            'payment_reference' => ['nullable', 'string', 'max:80'],
+            'payment_reference' => DocumentRequest::referenceRules($this->input('payment_method')),
             'payment_proof' => $file,
 
             'pickup_by' => ['required', Rule::in(['self', 'representative'])],
@@ -30,8 +30,18 @@ class StoreDocumentRequest extends FormRequest
         ];
     }
 
+    /** Normalize the reference first so the format and uniqueness checks compare the same value. */
+    protected function prepareForValidation(): void
+    {
+        if ($this->filled('payment_reference')) {
+            $this->merge(['payment_reference' => DocumentRequest::normalizeReference($this->input('payment_reference'))]);
+        }
+    }
+
     public function messages(): array
     {
-        return ['representative_name.required_if' => 'Please enter the full name of the person who will pick up the document.'];
+        return DocumentRequest::referenceMessages() + [
+            'representative_name.required_if' => 'Please enter the full name of the person who will pick up the document.',
+        ];
     }
 }

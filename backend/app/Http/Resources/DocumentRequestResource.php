@@ -28,6 +28,9 @@ class DocumentRequestResource extends JsonResource
             'payment_reference' => $this->payment_reference,
             'payment_proof_url' => $this->url($this->payment_proof_path),
             'payment_status' => $this->payment_status,
+            'payment_submitted_at' => $this->payment_submitted_at?->toIso8601String(),
+            'payment_verified_at' => $this->payment_verified_at?->toIso8601String(),
+            'payment_verified_by' => $this->whenLoaded('paymentVerifier', fn () => $this->paymentVerifier?->name),
 
             'pickup_by' => $this->pickup_by,
             'representative_name' => $this->representative_name,
@@ -45,11 +48,13 @@ class DocumentRequestResource extends JsonResource
                 'contact_number' => $this->student->contact_number,
                 'name' => $this->student->user?->name,
                 'email' => $this->student->user?->email,
+                'avatar_url' => $this->student->user?->avatar_url,
             ]),
             'processor' => $this->whenLoaded('processor', fn () => $this->processor?->name),
             'histories' => $this->whenLoaded('histories', fn () => $this->histories->map(fn ($h) => [
                 'id' => $h->id, 'old_status' => $h->old_status, 'new_status' => $h->new_status,
                 'remarks' => $h->remarks, 'by' => $h->changer?->name, 'role' => $h->changer?->role,
+                'by_avatar_url' => $h->changer?->avatar_url,
                 'created_at' => $h->created_at?->toIso8601String(),
             ])),
             'created_at' => $this->created_at?->toIso8601String(),

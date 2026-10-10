@@ -1,8 +1,62 @@
-import { useState } from 'react';
-import api, { errMsg, fieldErrors } from '../api';
+import { useRef, useState } from 'react';
+import api, { AVATAR_MAX_MB, AVATAR_TYPES, errMsg, fieldErrors } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { Button, Card, Field, PageHeader, inputCls } from '../components/ui';
+import { useConfirm } from '../context/ConfirmContext';
+import { Avatar, Button, Card, Field, Icon, PageHeader, inputCls } from '../components/ui';
+
+/** Upload / change / remove the profile picture. Works for both students and admins. */
+function PhotoCard({ user, setUser }) {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const input = useRef(null);
+  const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState(null);   // local preview shown while the upload is running
+
+  const pick = async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';   // allow choosing the same file again later
+    if (!file) return;
+    // Quick checks here for instant feedback; the API validates again.
+    if (!AVATAR_TYPES.includes(file.type)) return toast('Please choose a JPG, PNG or WebP image.', 'error');
+    if (file.size > AVATAR_MAX_MB * 1024 * 1024) return toast(`The photo must be ${AVATAR_MAX_MB} MB or smaller.`, 'error');
+
+    const url = URL.createObjectURL(file);
+    setPreview(url); setBusy(true);
+    const fd = new FormData();
+    fd.append('photo', file);
+    try {
+      const r = await api.post('/profile/photo', fd);
+      setUser(r.data.user);   // sidebar picture updates immediately
+      toast('Profile picture updated.');
+    } catch (err) { toast(errMsg(err), 'error'); }
+    finally { setBusy(false); setPreview(null); URL.revokeObjectURL(url); }
+  };
+
+  const remove = async () => {
+    if (!(await confirm({ title: 'Remove profile picture?', message: 'Your initial will be shown instead.', danger: true, confirmText: 'Remove', cancelText: 'Keep' }))) return;
+    setBusy(true);
+    try { const r = await api.delete('/profile/photo'); setUser(r.data.user); toast('Profile picture removed.'); }
+    catch (err) { toast(errMsg(err), 'error'); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <Card title="Profile picture" subtitle={`JPG, PNG or WebP · up to ${AVATAR_MAX_MB} MB`}>
+      <div className="flex flex-wrap items-center gap-5">
+        <Avatar user={{ ...user, avatar_url: preview || user.avatar_url }} size={112} className={`ring-4 ring-brand-100 ${busy ? 'opacity-60' : ''}`} />
+        <div className="space-y-2">
+          <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={pick} />
+          <div className="flex flex-wrap gap-2">
+            <Button loading={busy} onClick={() => input.current?.click()}><Icon name="camera" size={16} />{user.avatar_url ? 'Change photo' : 'Upload photo'}</Button>
+            {user.avatar_url && <Button variant="dangerOutline" disabled={busy} onClick={remove}>Remove</Button>}
+          </div>
+          <p className="text-xs text-slate-500">{user.role === 'admin' ? 'Students see this photo next to your status updates.' : 'Admins can see this photo when they process your requests.'}</p>
+        </div>
+      </div>
+    </Card>
+  );
+}
 
 export default function Profile() {
   const { user, setUser } = useAuth();
@@ -34,8 +88,9 @@ export default function Profile() {
 
   return (
     <div className="space-y-6">
-    <PageHeader title="My Profile" subtitle="Update your details and password." />
+    <PageHeader title="My Profile" subtitle="Update your picture, details and password." />
     <div className="grid gap-6 lg:grid-cols-2">
+      <PhotoCard user={user} setUser={setUser} />
       <Card title="Profile">
         <form onSubmit={saveProfile} className="space-y-3">
           {s && <Field label="Student ID"><input className={inputCls} value={s.student_number} disabled /></Field>}

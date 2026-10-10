@@ -78,8 +78,12 @@ class DatabaseSeeder extends Seeder
                 'copies' => 1, 'purpose' => 'Employment / scholarship requirement',
                 'preferred_claim_date' => now()->addDays(7)->toDateString(), 'status' => 'Pending',
                 'amount' => $types[$ti]->fee, 'payment_method' => $method,
-                'payment_reference' => $pay === 'Unpaid' ? null : 'REF'.random_int(100000, 999999),
+                // Realistic sample references that pass the app's validation (GCash: digits, bank: letters/digits).
+                'payment_reference' => $pay === 'Unpaid' ? null : ($method === 'GCash' ? (string) random_int(1000000000000, 9999999999999) : 'TRF'.random_int(10000000, 99999999)),
                 'payment_status' => $pay,
+                'payment_submitted_at' => $pay === 'Unpaid' ? null : now(),
+                'payment_verified_at' => $pay === 'Verified' ? now() : null,
+                'payment_verified_by' => $pay === 'Verified' ? $admin->id : null,
                 'pickup_by' => $by, 'representative_name' => $by === 'representative' ? 'Maria Reyes' : null,
             ]);
             $req->histories()->create(['new_status' => 'Pending', 'remarks' => 'Request submitted.', 'changed_by' => $made[$si]->user_id]);

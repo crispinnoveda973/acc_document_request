@@ -2,6 +2,15 @@ import { useEffect, useState } from 'react';
 import api from '../api';
 import { Icon, Logo } from './ui';
 
+/**
+ * Campus photo for the login / register pages (file: frontend/public/login-image.jpg).
+ * Sized by the parent through className; hides itself if the file is missing so the page never shows a broken icon.
+ */
+const CampusImage = ({ className = '' }) => (
+  <img src="/login-image.jpg" alt="Abuyog Community College campus" onError={(e) => { e.currentTarget.style.display = 'none'; }}
+    className={`w-full object-cover ${className}`} />
+);
+
 /** Split-screen layout for Login / Register: About ACC on the left, form on the right. */
 export default function AuthShell({ children }) {
   const [info, setInfo] = useState({});
@@ -22,6 +31,7 @@ export default function AuthShell({ children }) {
 
         <div className="relative max-w-xl space-y-6">
           <h2 className="text-4xl font-extrabold leading-tight xl:text-5xl">Request your school documents <span className="text-gold-400">online.</span></h2>
+          <CampusImage className="aspect-[3/2] max-w-md rounded-2xl shadow-2xl ring-4 ring-white/20" />
           <p className="text-base leading-relaxed text-white/80">{info.about_text}</p>
           <ul className="grid gap-3 text-sm text-white/90 sm:grid-cols-2">
             {['Request anytime, from anywhere', 'Pay with GCash or bank transfer', 'Track every step with a transaction number', 'Get notified when it is ready for pick-up'].map((t) => (
@@ -43,6 +53,8 @@ export default function AuthShell({ children }) {
           <Logo size={48} className="ring-2 ring-brand-700" />
           <div className="leading-tight"><div className="font-bold text-brand-800">Abuyog Community College</div><div className="text-xs text-slate-500">Student Document Request System</div></div>
         </div>
+        {/* Phones and tablets: the left panel is hidden, so show the photo above the form. */}
+        <CampusImage className="mx-auto mb-6 h-40 max-w-md rounded-2xl shadow-lg ring-1 ring-slate-200 sm:h-52 lg:hidden" />
         <div className="mx-auto w-full max-w-md">{children}</div>
       </section>
     </div>

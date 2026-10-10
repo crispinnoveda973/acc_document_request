@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DocumentTypeController;
 use App\Http\Controllers\Api\NoticeController;
 use App\Http\Controllers\Api\SettingsController;
+use App\Http\Controllers\Api\StudentController;
 use App\Http\Controllers\Api\StudentRequestController;
 use Illuminate\Support\Facades\Route;
 
@@ -17,6 +18,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::put('/profile', [AuthController::class, 'updateProfile']);
     Route::put('/password', [AuthController::class, 'changePassword']);
+    // POST (not PUT) because PHP does not parse multipart bodies on PUT requests.
+    Route::post('/profile/photo', [AuthController::class, 'updatePhoto'])->middleware('throttle:20,1');
+    Route::delete('/profile/photo', [AuthController::class, 'deletePhoto']);
 
     Route::get('/document-types', [DocumentTypeController::class, 'index']);
     Route::get('/settings', [SettingsController::class, 'index']);
@@ -35,6 +39,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ---- Admin ----
     Route::middleware('role:admin')->prefix('admin')->group(function () {
         Route::get('/stats', [AdminRequestController::class, 'stats']);
+        Route::get('/students', [StudentController::class, 'index']);   // every student with profile picture
         Route::get('/requests', [AdminRequestController::class, 'index']);
         Route::get('/requests/{id}', [AdminRequestController::class, 'show']);
         Route::put('/requests/{id}', [AdminRequestController::class, 'update']);

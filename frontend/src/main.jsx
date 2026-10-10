@@ -19,6 +19,7 @@ import AdminDashboard from './pages/admin/Dashboard';
 import AdminRequests from './pages/admin/Requests';
 import DocumentTypes from './pages/admin/DocumentTypes';
 import SiteSettings from './pages/admin/SiteSettings';
+import Students from './pages/admin/Students';
 
 function Home() {
   const { user } = useAuth();
@@ -46,6 +47,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                   </Route>
                   <Route element={<ProtectedRoute roles={['admin']} />}>
                     <Route path="/requests" element={<AdminRequests />} />
+                    <Route path="/students" element={<Students />} />
                     <Route path="/document-types" element={<DocumentTypes />} />
                     <Route path="/settings" element={<SiteSettings />} />
                   </Route>

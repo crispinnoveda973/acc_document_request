@@ -86,12 +86,43 @@ There are only two roles: **Admin** and **Student** (the "user").
 | Student | ana@student.acc.edu.ph (2022-0042)  | Student@12345  |
 | Student | pedro@student.acc.edu.ph (2024-0107)| Student@12345  |
 
-> Upgrading from the old version? Run `php artisan migrate:fresh --seed` again. The database layout changed
+> **Upgrading an existing install (profile pictures + payment tracking)?** Copy `backend-overlay/*` over your `backend/` folder
+> again, then run `php artisan migrate` (adds `users.profile_photo_path` and the `payment_*` tracking columns; no data is lost).
+> Make sure `php artisan storage:link` has been run, otherwise uploaded pictures will not show.
+> Fresh install? `php artisan migrate:fresh --seed` already includes everything.
+
+> Upgrading from the very old version? Run `php artisan migrate:fresh --seed` again. The database layout changed
 > (transaction numbers, payments, pick-up date, settings) and the old **Staff** role no longer exists.
 
-## Your logo
-Put the college logo at `frontend/public/logo.png` (square PNG). It appears on the login page, sidebar and About page.
-Until then a round "ACC" badge is shown.
+## Branding images (already included)
+All in `frontend/public/` — replace the file (same name) to change it everywhere:
+- `logo.png` — the ACC seal (square PNG, 512px). Used by the single `<Logo>` component: login/register, sidebar, About page.
+- `favicon.png` — browser-tab icon.
+- `login-image.jpg` — campus photo on the login/register pages (side panel on desktop, banner above the form on phones/tablets).
+  The supplied photo is small (330×220), so it is shown as a framed photo rather than stretched full-screen. For a sharper result,
+  replace it with a larger landscape image (about 1200×800 or more).
+
+## Profile pictures
+- Students **and** admins: **My Profile → Profile picture** → Upload / Change / Remove (JPG, PNG or WebP, max 2 MB).
+  Files are saved on the `public` disk under `storage/app/public/avatars/` and served from `/storage/avatars/...`; the old file is deleted when replaced.
+- The picture shows in the sidebar, and next to the person's name in the status timeline.
+- Admins see each student's picture on the dashboard, in **All Requests**, on the request page (Student card) and in the new
+  **Students** page (search, click a picture to enlarge it). A student without a photo shows a coloured initial.
+- API: `POST /api/profile/photo` (field `photo`), `DELETE /api/profile/photo`, admin: `GET /api/admin/students`.
+
+## How payments work (GCash and Bank Transfer)
+Payments are **confirmed manually by the admin** — there is no payment-gateway connection (that would need a merchant account
+with API keys, e.g. PayMongo / Xendit / Maya). The flow, with every step validated on the server:
+1. The admin fills in the GCash number / bank account under **Site Settings** (students see these with copy buttons).
+2. The student picks GCash or Bank Transfer, pays, and sends a **reference number** and/or **receipt** (JPG/PNG/PDF, max 5 MB) —
+   when submitting the request or later from the request page. Status: `Unpaid` → `For Verification`.
+   - GCash reference: 10–20 digits. Bank reference: 6–40 letters/digits. Spaces/dashes are ignored.
+   - The same reference number cannot be used on two requests (stops a receipt being reused).
+3. The admin opens the request, checks the reference/receipt, and clicks **Verify payment** (`Verified`, with who/when saved)
+   or **Payment not received** (back to `Unpaid`, the student is notified and must send details again).
+   An admin can only verify a payment the student actually submitted.
+4. A paid document cannot be set to **Ready for Pick-up** or **Completed** until its payment is `Verified`.
+Saved per request: method, reference no., receipt file, amount, payment status, when details were sent, when/who verified.
 
 ## What's new in this version
 - **Layout**: full-width sidebar layout that uses the whole screen; split-screen login/register with *About Abuyog Community College*.
@@ -116,6 +147,13 @@ Until then a round "ACC" badge is shown.
 5. As Juan the request now shows "Ready for pick-up on <date>" (and the authorization-letter reminder if a representative was chosen).
 6. Admin -> **Site Settings**: edit the claim steps, upload a guide image/PDF, set GCash/bank details. Students see them under **How to Claim**.
 7. As Juan submit another request and **Cancel** it while Pending (dialog asks for an optional reason; admins are notified).
+8. **Profile pictures**: as Juan open *My Profile*, upload a JPG/PNG (try a 3 MB file or a .gif — you should get a clear error). The sidebar updates.
+   Log in as admin → *Students*, *All Requests* and the request page now show Juan's picture. Upload one for the admin too. Try *Remove*.
+9. **GCash**: new request → GCash → reference `1234567890123` (try `ABC` → rejected) → submit → payment shows *For Verification*.
+   Admin: *Verify payment* → *Verified* (shows who/when). Submit the same reference on another request → rejected as already used.
+10. **Bank Transfer**: same with reference like `TRF12345678` (symbols such as `AB#12` are rejected), or upload a receipt only.
+11. As admin try *Ready for Pick-up* on a request whose payment is not verified → blocked with a message. Use *Payment not received* → student must re-send.
+12. **Logo / login image**: log out and check the login page on a wide window and a phone-width window (photo above the form).
 
 ## Production / deployment notes
 - Build the frontend: `cd frontend && npm run build` → serve `frontend/dist` from the same domain as the API
@@ -128,7 +166,8 @@ Until then a round "ACC" badge is shown.
 - **Change all seeded passwords** (or remove the sample users from `DatabaseSeeder`) before going live.
 - Email notifications: in-app notifications are built in. To add email, set `MAIL_*` in `.env` and send a Mailable
   from `DocumentRequest::changeStatus()`.
-- Payments are verified manually by the admin (no payment gateway is connected).
+- Payments are verified manually by the admin (no payment gateway is connected) — see "How payments work".
+- Backup `storage/app/public/` too: it holds profile pictures, receipts and claim-process files.
 
 ## Troubleshooting
 - `SQLSTATE ... Unknown database` → Step 1 not done or wrong `DB_DATABASE`.

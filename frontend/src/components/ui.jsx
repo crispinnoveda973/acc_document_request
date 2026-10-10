@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 /* ---------- icons ---------- */
 const PATHS = {
@@ -25,6 +25,8 @@ const PATHS = {
   pin: 'M12 22s7-6.2 7-12a7 7 0 10-14 0c0 5.8 7 12 7 12zM12 12a2 2 0 100-4 2 2 0 000 4z',
   alert: 'M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z',
   trash: 'M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3',
+  users: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.9M16 3.1a4 4 0 010 7.8',
+  camera: 'M3 8a2 2 0 012-2h2l1.5-2h7L17 6h2a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2zM12 17a4 4 0 100-8 4 4 0 000 8z',
 };
 export const Icon = ({ name, size = 20, className = '' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
@@ -32,7 +34,7 @@ export const Icon = ({ name, size = 20, className = '' }) => (
   </svg>
 );
 
-/* ---------- logo (drop your own file at frontend/public/logo.png) ---------- */
+/* ---------- logo (the college seal lives at frontend/public/logo.png; replace that file to change it everywhere) ---------- */
 export const Logo = ({ size = 40, className = '' }) => {
   const [ok, setOk] = useState(true);
   return ok ? (
@@ -41,6 +43,28 @@ export const Logo = ({ size = 40, className = '' }) => {
   ) : (
     <span className={`grid shrink-0 place-items-center rounded-full bg-white font-extrabold text-brand-800 ring-2 ring-gold-400 ${className}`}
       style={{ width: size, height: size, fontSize: size * 0.3 }}>ACC</span>
+  );
+};
+
+/**
+ * Round profile picture. Falls back to the user's initial when there is no photo
+ * (or the file cannot be loaded). `user` is any object with `name` and `avatar_url`.
+ */
+export const Avatar = ({ user, size = 40, className = '' }) => {
+  const [broken, setBroken] = useState(false);
+  const url = user?.avatar_url;
+  useEffect(() => setBroken(false), [url]);   // a new photo gets a fresh chance to load
+  const name = user?.name || '?';
+  const box = { width: size, height: size };
+
+  return url && !broken ? (
+    <img src={url} alt={name} onError={() => setBroken(true)} style={box}
+      className={`shrink-0 rounded-full bg-slate-200 object-cover ${className}`} />
+  ) : (
+    <span style={{ ...box, fontSize: size * 0.42 }} aria-label={name}
+      className={`grid shrink-0 place-items-center rounded-full bg-gold-500 font-bold uppercase text-brand-900 ${className}`}>
+      {name[0]}
+    </span>
   );
 };
 

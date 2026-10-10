@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import api, { STATUSES, errMsg, fmt, fmtDate, peso } from '../../api';
 import { useToast } from '../../context/ToastContext';
-import { Button, Card, Empty, PageHeader, Spinner, StatusBadge, inputCls } from '../../components/ui';
+import { Avatar, Button, Card, Empty, PageHeader, Spinner, StatusBadge, inputCls } from '../../components/ui';
 
 export default function AdminRequests() {
   const toast = useToast();
   const [params] = useSearchParams();
   const [filters, setFilters] = useState({
-    search: '', status: params.get('status') || '', payment_status: params.get('payment_status') || '',
+    search: params.get('search') || '', status: params.get('status') || '', payment_status: params.get('payment_status') || '',
     document_type_id: '', date_from: '', date_to: '', trashed: false,
   });
   const [page, setPage] = useState(1);
@@ -63,7 +63,7 @@ export default function AdminRequests() {
                   {res.data.map((r) => (
                     <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50/60">
                       <td className="px-5 py-3.5"><Link className="font-mono text-xs font-semibold text-brand-700 underline" to={`/requests/${r.id}`}>{r.transaction_number}</Link><div className="text-xs text-slate-400">{r.reference_number}</div></td>
-                      <td className="font-medium text-slate-900">{r.student?.name}<div className="text-xs font-normal text-slate-500">{r.student?.student_number}</div></td>
+                      <td><div className="flex items-center gap-3"><Avatar user={r.student} size={36} /><div className="font-medium text-slate-900">{r.student?.name}<div className="text-xs font-normal text-slate-500">{r.student?.student_number}</div></div></div></td>
                       <td>{r.document_type?.name}<div className="text-xs text-slate-500">{r.copies} {r.copies > 1 ? 'copies' : 'copy'}</div></td>
                       <td className="whitespace-nowrap">{peso(r.amount)}<div className="text-xs text-slate-500">{r.payment_method}</div></td>
                       <td><StatusBadge status={r.payment_status} /></td>

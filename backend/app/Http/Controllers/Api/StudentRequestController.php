@@ -10,6 +10,8 @@ use App\Models\DocumentType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class StudentRequestController extends Controller
 {
@@ -36,32 +38,39 @@ class StudentRequestController extends Controller
         $hasPayment = ! empty($d['payment_reference']) || $proof;
         $self = $d['pickup_by'] === 'self';
 
-        $req = DB::transaction(function () use ($d, $student, $type, $attachment, $proof, $letter, $hasPayment, $self, $r) {
-            $req = DocumentRequest::create([
-                'reference_number' => DocumentRequest::nextReference(),
-                'transaction_number' => DocumentRequest::nextTransaction(),
-                'student_id' => $student->id,
-                'document_type_id' => $type->id,
-                'copies' => $d['copies'],
-                'purpose' => strip_tags($d['purpose']),
-                'preferred_claim_date' => $d['preferred_claim_date'] ?? null,
-                'status' => 'Pending',
-                'attachment_path' => $attachment,
-                'amount' => $type->fee * $d['copies'],
-                'payment_method' => $d['payment_method'],
-                'payment_reference' => isset($d['payment_reference']) ? strip_tags($d['payment_reference']) : null,
-                'payment_proof_path' => $proof,
-                'payment_status' => $hasPayment ? 'For Verification' : 'Unpaid',
-                'pickup_by' => $d['pickup_by'],
-                'representative_name' => $self ? null : strip_tags($d['representative_name']),
-                'authorization_letter_path' => $self ? null : $letter,
-            ]);
-            $req->histories()->create([
-                'old_status' => null, 'new_status' => 'Pending',
-                'remarks' => 'Request submitted.', 'changed_by' => $r->user()->id,
-            ]);
-            return $req;
-        });
+        try {
+            $req = DB::transaction(function () use ($d, $student, $type, $attachment, $proof, $letter, $hasPayment, $self, $r) {
+                $req = DocumentRequest::create([
+                    'reference_number' => DocumentRequest::nextReference(),
+                    'transaction_number' => DocumentRequest::nextTransaction(),
+                    'student_id' => $student->id,
+                    'document_type_id' => $type->id,
+                    'copies' => $d['copies'],
+                    'purpose' => strip_tags($d['purpose']),
+                    'preferred_claim_date' => $d['preferred_claim_date'] ?? null,
+                    'status' => 'Pending',
+                    'attachment_path' => $attachment,
+                    'amount' => $type->fee * $d['copies'],
+                    'payment_method' => $d['payment_method'],
+                    'payment_reference' => $d['payment_reference'] ?? null,   // already normalized + validated
+                    'payment_proof_path' => $proof,
+                    'payment_status' => $hasPayment ? 'For Verification' : 'Unpaid',
+                    'payment_submitted_at' => $hasPayment ? now() : null,
+                    'pickup_by' => $d['pickup_by'],
+                    'representative_name' => $self ? null : strip_tags($d['representative_name']),
+                    'authorization_letter_path' => $self ? null : $letter,
+                ]);
+                $req->histories()->create([
+                    'old_status' => null, 'new_status' => 'Pending',
+                    'remarks' => 'Request submitted.', 'changed_by' => $r->user()->id,
+                ]);
+                return $req;
+            });
+        } catch (\Throwable $e) {
+            // Do not leave orphaned uploads behind if saving the request failed.
+            Storage::disk('public')->delete(array_filter([$attachment, $proof, $letter]));
+            throw $e;
+        }
 
         // Tell every admin that a new request came in.
         $req->notifyAdmins("New request {$req->reference_number} ({$type->name}) from {$r->user()->name}.");
@@ -87,20 +96,33 @@ class StudentRequestController extends Controller
     public function pay(Request $r, DocumentRequest $documentRequest)
     {
         Gate::authorize('pay', $documentRequest);
-        $d = $r->validate([
-            'payment_method' => ['required', 'in:'.implode(',', DocumentRequest::PAYMENT_METHODS)],
-            'payment_reference' => ['nullable', 'string', 'max:80', 'required_without:payment_proof'],
-            'payment_proof' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120', 'required_without:payment_reference'],
-        ], ['payment_reference.required_without' => 'Enter your payment reference number or upload your receipt.']);
+        // Normalize first so the format + "already used" checks compare the same value.
+        if ($r->filled('payment_reference')) {
+            $r->merge(['payment_reference' => DocumentRequest::normalizeReference($r->input('payment_reference'))]);
+        }
 
+        $d = $r->validate([
+            'payment_method' => ['required', Rule::in(DocumentRequest::PAYMENT_METHODS)],
+            'payment_reference' => array_merge(
+                DocumentRequest::referenceRules($r->input('payment_method'), $documentRequest->id),
+                ['required_without:payment_proof']
+            ),
+            'payment_proof' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120', 'required_without:payment_reference'],
+        ], DocumentRequest::referenceMessages());
+
+        $oldProof = $documentRequest->payment_proof_path;
         if ($r->hasFile('payment_proof')) {
             $documentRequest->payment_proof_path = $r->file('payment_proof')->store('payments', 'public');
         }
         $documentRequest->fill([
             'payment_method' => $d['payment_method'],
-            'payment_reference' => isset($d['payment_reference']) ? strip_tags($d['payment_reference']) : $documentRequest->payment_reference,
+            'payment_reference' => $d['payment_reference'] ?? $documentRequest->payment_reference,
             'payment_status' => 'For Verification',
+            'payment_submitted_at' => now(),
         ])->save();
+
+        // The replaced receipt is no longer needed (delete only after the new one is saved).
+        if ($oldProof && $oldProof !== $documentRequest->payment_proof_path) Storage::disk('public')->delete($oldProof);
 
         $documentRequest->histories()->create([
             'old_status' => $documentRequest->status, 'new_status' => $documentRequest->status,

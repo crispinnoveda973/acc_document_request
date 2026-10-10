@@ -12,7 +12,7 @@ use Illuminate\Validation\ValidationException;
 
 class AdminRequestController extends Controller
 {
-    private const FULL = ['student.user', 'documentType', 'processor', 'histories.changer'];
+    private const FULL = ['student.user', 'documentType', 'processor', 'paymentVerifier', 'histories.changer'];
 
     public function stats()
     {
@@ -114,6 +114,14 @@ class AdminRequestController extends Controller
             return new DocumentRequestResource($req->fresh(self::FULL));
         }
 
+        // A document that has to be paid for cannot be released before the payment is verified.
+        if (in_array($d['status'], DocumentRequest::NEEDS_VERIFIED_PAYMENT, true)
+            && $req->amount > 0 && $req->payment_status !== 'Verified') {
+            throw ValidationException::withMessages([
+                'status' => "Verify the student's payment first before setting the status to \"{$d['status']}\".",
+            ]);
+        }
+
         $req->changeStatus(
             $d['status'],
             isset($d['remarks']) ? strip_tags($d['remarks']) : null,
@@ -133,7 +141,23 @@ class AdminRequestController extends Controller
             'remarks' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $req->update(['payment_status' => $d['payment_status']]);
+        if (in_array($req->status, DocumentRequest::FINAL, true)) {
+            throw ValidationException::withMessages(['payment_status' => "This request is already {$req->status}, so its payment can no longer be changed."]);
+        }
+        if ($d['payment_status'] === 'Verified') {
+            if ($req->payment_status === 'Verified') {
+                throw ValidationException::withMessages(['payment_status' => 'This payment is already verified.']);
+            }
+            // Only payments the student has actually submitted (reference no. and/or receipt) can be verified.
+            if ($req->payment_status !== 'For Verification') {
+                throw ValidationException::withMessages(['payment_status' => 'The student has not sent any payment details yet, so there is nothing to verify.']);
+            }
+        }
+
+        $req->update($d['payment_status'] === 'Verified'
+            ? ['payment_status' => 'Verified', 'payment_verified_at' => now(), 'payment_verified_by' => $r->user()->id]
+            // "Payment not received": the student must send their details again.
+            : ['payment_status' => 'Unpaid', 'payment_submitted_at' => null, 'payment_verified_at' => null, 'payment_verified_by' => null]);
         $note = $d['payment_status'] === 'Verified'
             ? 'Payment verified.'
             : 'Payment could not be verified, please send your payment details again.';

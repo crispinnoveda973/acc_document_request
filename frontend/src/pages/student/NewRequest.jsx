@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api, { PAYMENT_METHODS, errMsg, fieldErrors, peso, today } from '../../api';
+import api, { REF_RULES, errMsg, fieldErrors, peso, refError, today } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import useSettings from '../../useSettings';
-import { Button, Card, Field, Icon, Notice, PageHeader, Spinner, inputCls } from '../../components/ui';
+import { Button, Card, CopyChip, Field, Icon, Notice, PageHeader, Spinner, inputCls } from '../../components/ui';
 
 const Choice = ({ active, onClick, title, desc, icon }) => (
   <button type="button" onClick={onClick}
@@ -15,16 +15,17 @@ const Choice = ({ active, onClick, title, desc, icon }) => (
 
 export function PaymentInstructions({ method, s, amount }) {
   if (!s) return null;
+  // [label, value, copyable] — numbers get a copy button so students can paste them into their GCash / bank app.
   const rows = method === 'GCash'
-    ? [['Account name', s.gcash_name], ['GCash number', s.gcash_number]]
-    : [['Bank', s.bank_name], ['Account name', s.bank_account_name], ['Account number', s.bank_account_number]];
+    ? [['Account name', s.gcash_name], ['GCash number', s.gcash_number, true]]
+    : [['Bank', s.bank_name], ['Account name', s.bank_account_name], ['Account number', s.bank_account_number, true]];
   const filled = rows.filter(([, v]) => v);
   return (
     <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
       <p className="mb-2 text-sm font-semibold text-slate-900">Send {peso(amount)} via {method} to:</p>
       {filled.length === 0
         ? <p className="text-sm text-amber-700">The admin has not added {method} account details yet. Please ask the college office.</p>
-        : filled.map(([k, v]) => <div key={k} className="flex justify-between gap-4 border-b border-slate-200 py-1.5 text-sm last:border-0"><span className="text-slate-500">{k}</span><span className="font-semibold">{v}</span></div>)}
+        : filled.map(([k, v, copy]) => <div key={k} className="flex items-center justify-between gap-4 border-b border-slate-200 py-1.5 text-sm last:border-0"><span className="text-slate-500">{k}</span>{copy ? <CopyChip text={v} /> : <span className="font-semibold">{v}</span>}</div>)}
       {s.payment_notes && <p className="mt-3 text-xs text-slate-500">{s.payment_notes}</p>}
     </div>
   );
@@ -52,7 +53,11 @@ export default function NewRequest() {
   const file = (k) => (e) => setFiles({ ...files, [k]: e.target.files[0] || null });
 
   const submit = async (e) => {
-    e.preventDefault(); setBusy(true); setErrors({});
+    e.preventDefault(); setErrors({});
+    // Check the reference format before sending (the API checks it again).
+    const refProblem = refError(f.payment_method, f.payment_reference);
+    if (refProblem) { setErrors({ payment_reference: refProblem }); return toast(refProblem, 'error'); }
+    setBusy(true);
     const fd = new FormData();
     Object.entries(f).forEach(([k, v]) => v !== '' && fd.append(k, v));
     Object.entries(files).forEach(([k, v]) => v && fd.append(k, v));
@@ -97,7 +102,7 @@ export default function NewRequest() {
               {errors.payment_method && <p className="text-xs text-red-600">{errors.payment_method}</p>}
               <PaymentInstructions method={f.payment_method} s={s} amount={total} />
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Payment reference no. (if already paid)" error={errors.payment_reference}><input className={inputCls} value={f.payment_reference} onChange={set('payment_reference')} maxLength="80" /></Field>
+                <Field label="Payment reference no. (if already paid)" error={errors.payment_reference} hint={REF_RULES[f.payment_method].hint}><input className={inputCls} value={f.payment_reference} onChange={set('payment_reference')} maxLength="80" inputMode={f.payment_method === 'GCash' ? 'numeric' : 'text'} /></Field>
                 <Field label="Receipt / screenshot (optional)" error={errors.payment_proof}><input type="file" accept=".pdf,.jpg,.jpeg,.png" className={inputCls} onChange={file('payment_proof')} /></Field>
               </div>
               <p className="text-xs text-slate-500">Haven't paid yet? You can submit now and send your payment details later from your request page.</p>
