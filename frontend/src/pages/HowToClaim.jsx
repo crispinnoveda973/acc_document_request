@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import useSettings from '../useSettings';
+import { safeUrl } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { Card, Empty, Icon, Notice, PageHeader, Spinner } from '../components/ui';
 
@@ -43,11 +44,11 @@ export default function HowToClaim() {
               {files.map((f) => (
                 <figure key={f.index} className="overflow-hidden rounded-xl ring-1 ring-slate-200">
                   {f.is_image
-                    ? <a href={f.url} target="_blank" rel="noreferrer"><img src={f.url} alt={f.name} className="w-full" /></a>
-                    : <iframe src={f.url} title={f.name} className="h-[70vh] w-full bg-slate-50" />}
+                    ? <a href={safeUrl(f.url)} target="_blank" rel="noopener noreferrer"><img src={safeUrl(f.url)} alt={f.name} className="w-full" /></a>
+                    : <iframe src={safeUrl(f.url)} title={f.name} className="h-[70vh] w-full bg-slate-50" />}
                   <figcaption className="flex items-center justify-between gap-2 bg-slate-50 px-4 py-2 text-xs text-slate-600">
                     <span className="truncate">{f.name}</span>
-                    <a href={f.url} target="_blank" rel="noreferrer" className="font-semibold text-brand-700 underline">Open / download</a>
+                    <a href={safeUrl(f.url)} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-700 underline">Open / download</a>
                   </figcaption>
                 </figure>
               ))}

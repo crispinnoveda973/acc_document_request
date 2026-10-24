@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AdminRequestController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DocumentTypeController;
 use App\Http\Controllers\Api\NoticeController;
+use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\StudentController;
 use App\Http\Controllers\Api\StudentRequestController;
@@ -13,7 +14,7 @@ Route::post('/register', [AuthController::class, 'register'])->middleware('throt
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 Route::get('/info', [SettingsController::class, 'info']);   // public: About ACC on the login page
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'throttle:120,1'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::put('/profile', [AuthController::class, 'updateProfile']);
@@ -34,12 +35,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/requests/{documentRequest}', [StudentRequestController::class, 'show']);
         Route::post('/requests/{documentRequest}/cancel', [StudentRequestController::class, 'cancel']);
         Route::post('/requests/{documentRequest}/payment', [StudentRequestController::class, 'pay']);
+        Route::post('/year-level', [AuthController::class, 'answerYearLevel']);   // yearly "Are you now a ... year level?"
     });
 
     // ---- Admin ----
     Route::middleware('role:admin')->prefix('admin')->group(function () {
         Route::get('/stats', [AdminRequestController::class, 'stats']);
         Route::get('/students', [StudentController::class, 'index']);   // every student with profile picture
+        Route::get('/reports', [ReportController::class, 'show']);              // requests per document type: day / week / month
+        Route::get('/reports/export', [ReportController::class, 'export']);     // same report as a CSV file
         Route::get('/requests', [AdminRequestController::class, 'index']);
         Route::get('/requests/{id}', [AdminRequestController::class, 'show']);
         Route::put('/requests/{id}', [AdminRequestController::class, 'update']);

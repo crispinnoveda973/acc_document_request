@@ -19,7 +19,6 @@ class DocumentRequestResource extends JsonResource
             'copies' => $this->copies,
             'purpose' => $this->purpose,
             'preferred_claim_date' => $this->preferred_claim_date?->format('Y-m-d'),
-            'pickup_date' => $this->pickup_date?->format('Y-m-d'),
             'rejection_reason' => $this->rejection_reason,
             'attachment_url' => $this->url($this->attachment_path),
 
@@ -31,6 +30,7 @@ class DocumentRequestResource extends JsonResource
             'payment_submitted_at' => $this->payment_submitted_at?->toIso8601String(),
             'payment_verified_at' => $this->payment_verified_at?->toIso8601String(),
             'payment_verified_by' => $this->whenLoaded('paymentVerifier', fn () => $this->paymentVerifier?->name),
+            'payment_remarks' => $this->payment_remarks,
 
             'pickup_by' => $this->pickup_by,
             'representative_name' => $this->representative_name,

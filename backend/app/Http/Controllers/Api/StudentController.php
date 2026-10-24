@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\StudentResource;
 use App\Models\Student;
 use App\Models\User;
+use App\Support\Search;
 use Illuminate\Http\Request;
 
 /** Admin-only: browse all students together with their profile pictures. */
@@ -15,11 +16,13 @@ class StudentController extends Controller
     {
         $q = Student::with('user')->withCount('requests');
 
+        $r->validate(['search' => ['nullable', 'string', 'max:100']]);
         if ($s = trim((string) $r->search)) {
-            $q->where(function ($w) use ($s) {
-                $w->where('student_number', 'like', "%$s%")
-                  ->orWhere('course', 'like', "%$s%")
-                  ->orWhereHas('user', fn ($u) => $u->where('name', 'like', "%$s%")->orWhere('email', 'like', "%$s%"));
+            $like = Search::like($s);   // bound parameter + escaped wildcards
+            $q->where(function ($w) use ($like) {
+                $w->where('student_number', 'like', $like)
+                  ->orWhere('course', 'like', $like)
+                  ->orWhereHas('user', fn ($u) => $u->where('name', 'like', $like)->orWhere('email', 'like', $like));
             });
         }
 

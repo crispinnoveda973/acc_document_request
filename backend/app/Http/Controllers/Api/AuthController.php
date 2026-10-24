@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -26,6 +27,7 @@ class AuthController extends Controller
             Student::create([
                 'user_id' => $user->id, 'student_number' => $d['student_number'],
                 'course' => strip_tags($d['course']), 'year_level' => $d['year_level'],
+                'year_level_checked_sy' => Student::currentSchoolYear(),   // just told us their level, so do not ask again this year
                 'contact_number' => $d['contact_number'],
             ]);
             return $user;
@@ -52,6 +54,27 @@ class AuthController extends Controller
         return response()->json(['user' => $user->payload(), 'token' => $user->createToken('acc')->plainTextToken]);
     }
 
+    /** Student answers the yearly "Are you now a [next] year level?" question. */
+    public function answerYearLevel(Request $r)
+    {
+        $d = $r->validate(['answer' => ['required', Rule::in(['yes', 'no'])]]);
+        $user = $r->user();
+        $student = $user->student;
+
+        $prompt = $student->yearLevelPrompt();
+        if (! $prompt) {
+            throw ValidationException::withMessages(['answer' => 'There is no year level question to answer right now.']);
+        }
+
+        $student->update([
+            // Yes -> move up one level. No -> keep the current level unchanged.
+            'year_level' => $d['answer'] === 'yes' ? $prompt['next_year_level'] : $student->year_level,
+            'year_level_checked_sy' => $prompt['school_year'],
+        ]);
+
+        return response()->json(['user' => $user->fresh()->payload()]);
+    }
+
     public function logout(Request $r)
     {
         $r->user()->currentAccessToken()->delete();
@@ -70,13 +93,18 @@ class AuthController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email', 'max:150', Rule::unique('users')->ignore($user->id)],
             'course' => ['sometimes', 'string', 'max:150'],
-            'year_level' => ['sometimes', 'string', 'max:20'],
+            'year_level' => ['sometimes', Rule::in(config('acc.year_levels'))],
             'contact_number' => ['sometimes', 'string', 'regex:/^[0-9+\-\s]{7,20}$/'],
         ]);
 
         $user->update(['name' => strip_tags($d['name']), 'email' => $d['email']]);
         if ($user->student) {
-            $user->student->update(collect($d)->only(['course', 'year_level', 'contact_number'])->all());
+            $changes = collect($d)->only(['course', 'year_level', 'contact_number'])->all();
+            // Editing the year level by hand counts as answering this school year's question.
+            if (isset($changes['year_level']) && $changes['year_level'] !== $user->student->year_level) {
+                $changes['year_level_checked_sy'] = Student::currentSchoolYear();
+            }
+            $user->student->update($changes);
         }
         return response()->json(['user' => $user->fresh()->payload()]);
     }
@@ -113,7 +141,7 @@ class AuthController extends Controller
     {
         $d = $r->validate([
             'current_password' => ['required', 'current_password'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['required', 'string', Password::min(8)->letters()->numbers(), 'confirmed'],
         ]);
         $r->user()->update(['password' => $d['password']]);
         return response()->json(['message' => 'Password updated.']);

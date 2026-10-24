@@ -16,5 +16,27 @@
 html, body, #root { min-height: 100%; }
 body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
 
+/* Tables: even cell spacing everywhere (Tailwind resets cell padding to 0, which made columns touch each other). */
+@layer components {
+  table th, table td { padding: .75rem 1rem; vertical-align: middle; }
+  table th:first-child, table td:first-child { padding-left: 1.25rem; }
+  table th:last-child, table td:last-child { padding-right: 1.25rem; }
+  table thead th { font-weight: 600; white-space: nowrap; }
+  table tbody tr:last-child td { border-bottom: 0; }
+}
+
+/* Visible keyboard focus */
+:focus-visible { outline: 2px solid var(--color-brand-600); outline-offset: 2px; }
+
 @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
 .pop { animation: pop .18s ease-out; }
+@media (prefers-reduced-motion: reduce) { .pop { animation: none; } * { transition-duration: .01ms !important; } }
+
+/* Printing (reports): hide the menu, header and buttons; use the full page width. */
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; }
+  .lg\:pl-64 { padding-left: 0 !important; }
+  main { max-width: none !important; padding: 0 !important; }
+  section { break-inside: avoid; box-shadow: none !important; }
+}

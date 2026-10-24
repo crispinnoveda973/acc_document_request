@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import api, { READY, errMsg, fmt, fmtDate, peso } from '../../api';
+import api, { READY, errMsg, fmt, peso } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { Avatar, Card, Empty, Icon, Notice, PageHeader, Spinner, StatCard, StatusBadge } from '../../components/ui';
 
 const BAR = {
   Pending: 'bg-amber-400', 'Under Review': 'bg-sky-400', Approved: 'bg-emerald-400', Processing: 'bg-indigo-400',
-  'Ready for Pick-up': 'bg-teal-500', Completed: 'bg-green-600', Rejected: 'bg-red-400', Cancelled: 'bg-slate-400',
+  'Ready to pick up': 'bg-teal-500', Completed: 'bg-green-600', Rejected: 'bg-red-400', Cancelled: 'bg-slate-400',
 };
 
 export default function AdminDashboard() {
@@ -35,8 +35,8 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 2xl:grid-cols-5">
         <Link to="/requests"><StatCard label="All requests" value={s.total} icon="file" /></Link>
         <Link to="/requests?status=Pending"><StatCard label="Pending (new)" value={pending} icon="bell" tone="amber" hint={`${s.today} submitted today`} /></Link>
-        <Link to="/requests?payment_status=For%20Verification"><StatCard label="Payments to verify" value={s.payments_to_verify} icon="wallet" tone="sky" /></Link>
-        <Link to={`/requests?status=${encodeURIComponent(READY)}`}><StatCard label="Ready for pick-up" value={s.counts[READY]} icon="check" tone="teal" /></Link>
+        <Link to="/requests?payment_status=Pending%20Verification"><StatCard label="Payments to verify" value={s.payments_to_verify} icon="wallet" tone="sky" /></Link>
+        <Link to={`/requests?status=${encodeURIComponent(READY)}`}><StatCard label="Ready to pick up" value={s.counts[READY]} icon="check" tone="teal" /></Link>
         <Link to="/requests?status=Completed"><StatCard label="Completed" value={s.counts.Completed} icon="check" tone="brand" /></Link>
       </div>
 
@@ -79,15 +79,15 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-3">
-        <Card title="Upcoming pick-ups" subtitle="Sorted by pick-up date" flush>
-          {s.ready.length === 0 ? <Empty icon="calendar">No documents are waiting for pick-up.</Empty> : (
+        <Card title="Ready to pick up" subtitle="Most recently updated first" flush>
+          {s.ready.length === 0 ? <Empty icon="check">No documents are waiting for pick-up.</Empty> : (
             <ul className="divide-y divide-slate-100">
               {s.ready.map((r) => (
                 <li key={r.id}>
                   <Link to={`/requests/${r.id}`} className="block px-5 py-3 hover:bg-slate-50">
                     <div className="flex items-center gap-2 text-sm font-semibold text-slate-900"><Avatar user={r.student} size={24} />{r.student?.name}</div>
                     <div className="text-xs text-slate-500">{r.document_type?.name}</div>
-                    <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-teal-700"><Icon name="calendar" size={13} />{fmtDate(r.pickup_date)}{r.pickup_by === 'representative' && ' · representative'}</div>
+                    <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-teal-700"><Icon name="check" size={13} />Ready to pick up.{r.pickup_by === 'representative' && ' · representative'}</div>
                   </Link>
                 </li>
               ))}

@@ -47,7 +47,9 @@ class SettingsController extends Controller
         $r->validate(['file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240']]);
         $file = $r->file('file');
         $list = Setting::files();
-        $list[] = ['name' => $file->getClientOriginalName(), 'path' => $file->store('claim-process', 'public')];
+        // The original file name is shown to users, so keep only safe characters (no markup, quotes or path parts).
+        $name = preg_replace('/[^\p{L}\p{N}\s._()\-]/u', '', basename($file->getClientOriginalName())) ?: 'file';
+        $list[] = ['name' => $name, 'path' => $file->store('claim-process', 'public')];
         Setting::put('claim_files', json_encode($list));
         return $this->index();
     }

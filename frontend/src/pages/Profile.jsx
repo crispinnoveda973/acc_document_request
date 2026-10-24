@@ -5,6 +5,8 @@ import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { Avatar, Button, Card, Field, Icon, PageHeader, inputCls } from '../components/ui';
 
+const YEAR_LEVELS = ['1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year'];
+
 /** Upload / change / remove the profile picture. Works for both students and admins. */
 function PhotoCard({ user, setUser }) {
   const toast = useToast();
@@ -98,7 +100,7 @@ export default function Profile() {
           <Field label="Email" error={pe.email}><input type="email" className={inputCls} value={p.email} onChange={(e) => setP({ ...p, email: e.target.value })} required /></Field>
           {s && <>
             <Field label="Course / Program" error={pe.course}><input className={inputCls} value={p.course} onChange={(e) => setP({ ...p, course: e.target.value })} required /></Field>
-            <Field label="Year Level" error={pe.year_level}><input className={inputCls} value={p.year_level} onChange={(e) => setP({ ...p, year_level: e.target.value })} required /></Field>
+            <Field label="Year Level" error={pe.year_level}><select className={inputCls} value={p.year_level} onChange={(e) => setP({ ...p, year_level: e.target.value })} required>{YEAR_LEVELS.map((y) => <option key={y}>{y}</option>)}</select></Field>
             <Field label="Contact Number" error={pe.contact_number}><input className={inputCls} value={p.contact_number} onChange={(e) => setP({ ...p, contact_number: e.target.value })} required /></Field>
           </>}
           <Button type="submit" loading={b1}>Save changes</Button>

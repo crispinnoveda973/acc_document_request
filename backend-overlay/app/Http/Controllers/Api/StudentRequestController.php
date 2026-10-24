@@ -32,10 +32,11 @@ class StudentRequestController extends Controller
 
         $store = fn (string $field, string $dir) => $r->hasFile($field) ? $r->file($field)->store($dir, 'public') : null;
         $attachment = $store('attachment', 'attachments');
-        $proof = $store('payment_proof', 'payments');
+        $online = in_array($d['payment_method'], DocumentRequest::ONLINE_METHODS, true);
+        $proof = $online ? $store('payment_proof', 'payments') : null;   // Cash has no receipt to upload
         $letter = $store('authorization_letter', 'authorization');
 
-        $hasPayment = ! empty($d['payment_reference']) || $proof;
+        $hasPayment = $online && (! empty($d['payment_reference']) || $proof);
         $self = $d['pickup_by'] === 'self';
 
         try {
@@ -54,7 +55,7 @@ class StudentRequestController extends Controller
                     'payment_method' => $d['payment_method'],
                     'payment_reference' => $d['payment_reference'] ?? null,   // already normalized + validated
                     'payment_proof_path' => $proof,
-                    'payment_status' => $hasPayment ? 'For Verification' : 'Unpaid',
+                    'payment_status' => $hasPayment ? 'Pending Verification' : 'Unpaid',
                     'payment_submitted_at' => $hasPayment ? now() : null,
                     'pickup_by' => $d['pickup_by'],
                     'representative_name' => $self ? null : strip_tags($d['representative_name']),
@@ -102,7 +103,8 @@ class StudentRequestController extends Controller
         }
 
         $d = $r->validate([
-            'payment_method' => ['required', Rule::in(DocumentRequest::PAYMENT_METHODS)],
+            // Students send details only for online payments; Cash is recorded by the admin at the office.
+            'payment_method' => ['required', Rule::in(DocumentRequest::ONLINE_METHODS)],
             'payment_reference' => array_merge(
                 DocumentRequest::referenceRules($r->input('payment_method'), $documentRequest->id),
                 ['required_without:payment_proof']
@@ -117,8 +119,9 @@ class StudentRequestController extends Controller
         $documentRequest->fill([
             'payment_method' => $d['payment_method'],
             'payment_reference' => $d['payment_reference'] ?? $documentRequest->payment_reference,
-            'payment_status' => 'For Verification',
+            'payment_status' => 'Pending Verification',
             'payment_submitted_at' => now(),
+            'payment_verified_at' => null, 'payment_verified_by' => null, 'payment_remarks' => null,
         ])->save();
 
         // The replaced receipt is no longer needed (delete only after the new one is saved).

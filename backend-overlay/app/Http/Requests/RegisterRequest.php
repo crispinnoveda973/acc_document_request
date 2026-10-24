@@ -3,6 +3,8 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 
 class RegisterRequest extends FormRequest
 {
@@ -15,9 +17,9 @@ class RegisterRequest extends FormRequest
             'name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email', 'max:150', 'unique:users,email'],
             'course' => ['required', 'string', 'max:150'],
-            'year_level' => ['required', 'string', 'max:20'],
+            'year_level' => ['required', Rule::in(config('acc.year_levels'))],
             'contact_number' => ['required', 'string', 'regex:/^[0-9+\-\s]{7,20}$/'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['required', 'string', Password::min(8)->letters()->numbers(), 'confirmed'],
         ];
     }
 }

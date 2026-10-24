@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api, { REF_RULES, errMsg, fieldErrors, peso, refError, today } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import useSettings from '../../useSettings';
-import { Button, Card, CopyChip, Field, Icon, Notice, PageHeader, Spinner, inputCls } from '../../components/ui';
+import { Button, Card, CopyChip, Field, Icon, ImagePreview, Notice, PageHeader, Spinner, inputCls } from '../../components/ui';
 
 const Choice = ({ active, onClick, title, desc, icon }) => (
   <button type="button" onClick={onClick}
@@ -15,6 +15,14 @@ const Choice = ({ active, onClick, title, desc, icon }) => (
 
 export function PaymentInstructions({ method, s, amount }) {
   if (!s) return null;
+  if (method === 'Cash') {
+    return (
+      <div className="rounded-xl bg-slate-50 p-4 text-sm ring-1 ring-slate-200">
+        <p className="font-semibold text-slate-900">Pay {peso(amount)} in cash at the college office.</p>
+        <p className="mt-1 text-slate-600">{s.office_hours ? `Office hours: ${s.office_hours}. ` : ''}Bring your transaction number. The admin will record your payment — there is nothing to upload.</p>
+      </div>
+    );
+  }
   // [label, value, copyable] — numbers get a copy button so students can paste them into their GCash / bank app.
   const rows = method === 'GCash'
     ? [['Account name', s.gcash_name], ['GCash number', s.gcash_number, true]]
@@ -55,12 +63,13 @@ export default function NewRequest() {
   const submit = async (e) => {
     e.preventDefault(); setErrors({});
     // Check the reference format before sending (the API checks it again).
-    const refProblem = refError(f.payment_method, f.payment_reference);
+    const online = f.payment_method !== 'Cash';
+    const refProblem = online ? refError(f.payment_method, f.payment_reference) : null;
     if (refProblem) { setErrors({ payment_reference: refProblem }); return toast(refProblem, 'error'); }
     setBusy(true);
     const fd = new FormData();
-    Object.entries(f).forEach(([k, v]) => v !== '' && fd.append(k, v));
-    Object.entries(files).forEach(([k, v]) => v && fd.append(k, v));
+    Object.entries(f).forEach(([k, v]) => v !== '' && !(!online && k === 'payment_reference') && fd.append(k, v));
+    Object.entries(files).forEach(([k, v]) => v && !(!online && k === 'payment_proof') && fd.append(k, v));
     try {
       const r = await api.post('/student/requests', fd);
       toast(`Submitted! Your transaction number is ${r.data.data.transaction_number}`);
@@ -89,23 +98,34 @@ export default function NewRequest() {
                 <Field label="Preferred claim date" error={errors.preferred_claim_date} hint="The admin will confirm the actual pick-up date."><input type="date" min={today()} className={inputCls} value={f.preferred_claim_date} onChange={set('preferred_claim_date')} /></Field>
               </div>
               <Field label="Purpose" error={errors.purpose}><textarea rows="3" maxLength="255" className={inputCls} value={f.purpose} onChange={set('purpose')} placeholder="e.g. Scholarship application, employment" required /></Field>
-              <Field label="Supporting file (optional · PDF/JPG/PNG, max 5MB)" error={errors.attachment}><input type="file" accept=".pdf,.jpg,.jpeg,.png" className={inputCls} onChange={file('attachment')} /></Field>
+              <div className="space-y-2">
+                <Field label="Supporting file (optional · PDF/JPG/PNG, max 5MB)" error={errors.attachment}><input type="file" accept=".pdf,.jpg,.jpeg,.png" className={inputCls} onChange={file('attachment')} /></Field>
+                <ImagePreview file={files.attachment} label="image preview" />
+              </div>
             </div>
           </Card>
 
           <Card title="2 · Payment method">
             <div className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-3">
                 <Choice icon="phone" title="GCash" desc="Pay using your GCash app" active={f.payment_method === 'GCash'} onClick={() => setF({ ...f, payment_method: 'GCash' })} />
                 <Choice icon="wallet" title="Bank Transfer" desc="Deposit or transfer to the college bank account" active={f.payment_method === 'Bank Transfer'} onClick={() => setF({ ...f, payment_method: 'Bank Transfer' })} />
+                <Choice icon="home" title="Cash" desc="Pay at the college office" active={f.payment_method === 'Cash'} onClick={() => setF({ ...f, payment_method: 'Cash' })} />
               </div>
               {errors.payment_method && <p className="text-xs text-red-600">{errors.payment_method}</p>}
               <PaymentInstructions method={f.payment_method} s={s} amount={total} />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Payment reference no. (if already paid)" error={errors.payment_reference} hint={REF_RULES[f.payment_method].hint}><input className={inputCls} value={f.payment_reference} onChange={set('payment_reference')} maxLength="80" inputMode={f.payment_method === 'GCash' ? 'numeric' : 'text'} /></Field>
-                <Field label="Receipt / screenshot (optional)" error={errors.payment_proof}><input type="file" accept=".pdf,.jpg,.jpeg,.png" className={inputCls} onChange={file('payment_proof')} /></Field>
-              </div>
-              <p className="text-xs text-slate-500">Haven't paid yet? You can submit now and send your payment details later from your request page.</p>
+              {f.payment_method !== 'Cash' ? (<>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Payment reference no. (if already paid)" error={errors.payment_reference} hint={REF_RULES[f.payment_method].hint}><input className={inputCls} value={f.payment_reference} onChange={set('payment_reference')} maxLength="80" inputMode={f.payment_method === 'GCash' ? 'numeric' : 'text'} /></Field>
+                  <div className="space-y-2">
+                    <Field label="Receipt / screenshot (optional)" error={errors.payment_proof}><input type="file" accept=".pdf,.jpg,.jpeg,.png" className={inputCls} onChange={file('payment_proof')} /></Field>
+                    <ImagePreview file={files.payment_proof} label="receipt preview" />
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500">Haven't paid yet? You can submit now and send your payment details later from your request page. The admin checks every GCash and bank payment before it is confirmed.</p>
+              </>) : (
+                <p className="text-xs text-slate-500">Your payment will be marked as paid once the admin records your cash payment at the office.</p>
+              )}
             </div>
           </Card>
 
@@ -122,7 +142,10 @@ export default function NewRequest() {
                   </Notice>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <Field label="Representative's full name" error={errors.representative_name}><input className={inputCls} value={f.representative_name} onChange={set('representative_name')} required /></Field>
-                    <Field label="Upload authorization letter (optional)" error={errors.authorization_letter} hint="You can also hand the printed letter in at pick-up."><input type="file" accept=".pdf,.jpg,.jpeg,.png" className={inputCls} onChange={file('authorization_letter')} /></Field>
+                    <div className="space-y-2">
+                      <Field label="Upload authorization letter (optional)" error={errors.authorization_letter} hint="You can also hand the printed letter in at pick-up."><input type="file" accept=".pdf,.jpg,.jpeg,.png" className={inputCls} onChange={file('authorization_letter')} /></Field>
+                      <ImagePreview file={files.authorization_letter} label="letter preview" />
+                    </div>
                   </div>
                 </>
               )}

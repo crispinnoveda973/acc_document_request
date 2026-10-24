@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import api, { errMsg, fieldErrors } from '../../api';
+import api, { errMsg, fieldErrors, safeUrl } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import useSettings from '../../useSettings';
@@ -82,8 +82,8 @@ export default function SiteSettings() {
               <ul className="space-y-2">
                 {s.claim_files.map((f) => (
                   <li key={f.index} className="flex items-center gap-3 rounded-xl bg-slate-50 p-2.5 ring-1 ring-slate-200">
-                    {f.is_image ? <img src={f.url} alt="" className="h-12 w-12 rounded-lg object-cover" /> : <span className="grid h-12 w-12 place-items-center rounded-lg bg-red-100 text-xs font-bold text-red-700">PDF</span>}
-                    <a href={f.url} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-sm font-medium text-slate-700 hover:underline">{f.name}</a>
+                    {f.is_image ? <img src={safeUrl(f.url)} alt="" className="h-12 w-12 rounded-lg object-cover" /> : <span className="grid h-12 w-12 place-items-center rounded-lg bg-red-100 text-xs font-bold text-red-700">PDF</span>}
+                    <a href={safeUrl(f.url)} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate text-sm font-medium text-slate-700 hover:underline">{f.name}</a>
                     <button type="button" onClick={() => removeFile(f)} className="rounded-lg p-2 text-red-600 hover:bg-red-50" aria-label="Remove"><Icon name="trash" size={17} /></button>
                   </li>
                 ))}

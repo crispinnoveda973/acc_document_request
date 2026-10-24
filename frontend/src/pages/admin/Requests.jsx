@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import api, { STATUSES, errMsg, fmt, fmtDate, peso } from '../../api';
+import api, { PAYMENT_STATUSES, STATUSES, errMsg, fmt, peso } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { Avatar, Button, Card, Empty, PageHeader, Spinner, StatusBadge, inputCls } from '../../components/ui';
 
@@ -38,7 +38,7 @@ export default function AdminRequests() {
             <option value="">All statuses</option>{STATUSES.map((s) => <option key={s}>{s}</option>)}
           </select>
           <select className={inputCls} value={filters.payment_status} onChange={(e) => set('payment_status', e.target.value)}>
-            <option value="">All payments</option>{['Unpaid', 'For Verification', 'Verified'].map((s) => <option key={s}>{s}</option>)}
+            <option value="">All payments</option>{PAYMENT_STATUSES.map((s) => <option key={s}>{s}</option>)}
           </select>
           <select className={inputCls} value={filters.document_type_id} onChange={(e) => set('document_type_id', e.target.value)}>
             <option value="">All documents</option>{types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -57,7 +57,7 @@ export default function AdminRequests() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                  <tr><th className="px-5 py-3">Transaction no.</th><th>Student</th><th>Document</th><th>Amount</th><th>Payment</th><th>Status</th><th>Pick-up</th><th className="pr-5">Submitted</th></tr>
+                  <tr><th className="px-5 py-3">Transaction no.</th><th>Student</th><th>Document</th><th>Amount</th><th>Payment</th><th>Status</th><th>Claimed by</th><th className="pr-5">Submitted</th></tr>
                 </thead>
                 <tbody>
                   {res.data.map((r) => (
@@ -68,7 +68,7 @@ export default function AdminRequests() {
                       <td className="whitespace-nowrap">{peso(r.amount)}<div className="text-xs text-slate-500">{r.payment_method}</div></td>
                       <td><StatusBadge status={r.payment_status} /></td>
                       <td><StatusBadge status={r.status} /></td>
-                      <td className="whitespace-nowrap text-slate-600">{r.pickup_date ? fmtDate(r.pickup_date) : '—'}<div className="text-xs text-slate-400">{r.pickup_by === 'representative' ? 'representative' : ''}</div></td>
+                      <td className="whitespace-nowrap text-slate-600">{r.pickup_by === 'representative' ? 'Representative' : 'Student'}</td>
                       <td className="whitespace-nowrap pr-5 text-slate-500">{fmt(r.created_at)}</td>
                     </tr>
                   ))}

@@ -39,6 +39,7 @@ class User extends Authenticatable
                 'id' => $s->id, 'student_number' => $s->student_number, 'course' => $s->course,
                 'year_level' => $s->year_level, 'contact_number' => $s->contact_number,
             ] : null,
+            'year_level_prompt' => $s?->yearLevelPrompt(),
         ];
     }
 }

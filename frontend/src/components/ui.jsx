@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { safeUrl } from '../api';
 
 /* ---------- icons ---------- */
 const PATHS = {
@@ -26,6 +27,13 @@ const PATHS = {
   alert: 'M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z',
   trash: 'M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3',
   users: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.9M16 3.1a4 4 0 010 7.8',
+  eye: 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12zM12 15a3 3 0 100-6 3 3 0 000 6z',
+  eyeOff: 'M17.9 17.9A10.9 10.9 0 0112 20C5 20 1 12 1 12a18.5 18.5 0 015.1-5.9M9.9 4.2A10.9 10.9 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.2 3.2M1 1l22 22M14.1 14.1a3 3 0 11-4.2-4.2',
+  chart: 'M4 20V10M10 20V4M16 20v-8M22 20H2',
+  download: 'M12 4v12M7 11l5 5 5-5M4 20h16',
+  printer: 'M7 9V3h10v6M7 17H5a2 2 0 01-2-2v-4a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2h-2M7 14h10v7H7zM17 11h.01',
+  chevL: 'M15 18l-6-6 6-6',
+  chevR: 'M9 18l6-6-6-6',
   camera: 'M3 8a2 2 0 012-2h2l1.5-2h7L17 6h2a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2zM12 17a4 4 0 100-8 4 4 0 000 8z',
 };
 export const Icon = ({ name, size = 20, className = '' }) => (
@@ -58,7 +66,7 @@ export const Avatar = ({ user, size = 40, className = '' }) => {
   const box = { width: size, height: size };
 
   return url && !broken ? (
-    <img src={url} alt={name} onError={() => setBroken(true)} style={box}
+    <img src={safeUrl(url)} alt={name} onError={() => setBroken(true)} style={box}
       className={`shrink-0 rounded-full bg-slate-200 object-cover ${className}`} />
   ) : (
     <span style={{ ...box, fontSize: size * 0.42 }} aria-label={name}
@@ -81,12 +89,12 @@ const COLORS = {
   'Under Review': 'bg-sky-100 text-sky-800',
   Approved: 'bg-emerald-100 text-emerald-800',
   Processing: 'bg-indigo-100 text-indigo-800',
-  'Ready for Pick-up': 'bg-teal-100 text-teal-800',
+  'Ready to pick up': 'bg-teal-100 text-teal-800',
   Completed: 'bg-green-200 text-green-900',
   Rejected: 'bg-red-100 text-red-800',
   Cancelled: 'bg-slate-200 text-slate-700',
   Unpaid: 'bg-slate-200 text-slate-700',
-  'For Verification': 'bg-amber-100 text-amber-800',
+  'Pending Verification': 'bg-amber-100 text-amber-800',
   Verified: 'bg-green-200 text-green-900',
 };
 export const StatusBadge = ({ status }) => (
@@ -95,11 +103,11 @@ export const StatusBadge = ({ status }) => (
 
 /* ---------- layout bits ---------- */
 export const Card = ({ title, subtitle, children, className = '', actions, flush }) => (
-  <section className={`rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/80 ${className}`}>
+  <section className={`rounded-xl bg-white ring-1 ring-slate-200 ${className}`}>
     {(title || actions) && (
-      <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-5 py-4">
+      <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-5 py-3.5">
         <div>
-          <h2 className="font-semibold text-slate-900">{title}</h2>
+          <h2 className="text-[15px] font-semibold text-slate-900">{title}</h2>
           {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
         </div>
         {actions}
@@ -125,8 +133,8 @@ export const StatCard = ({ label, value, icon, tone = 'brand', to, hint }) => {
     teal: 'bg-teal-100 text-teal-700', red: 'bg-red-100 text-red-700', slate: 'bg-slate-200 text-slate-700',
   };
   return (
-    <div className="flex items-center gap-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80 transition hover:ring-brand-600/50">
-      <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl ${tones[tone]}`}><Icon name={icon} size={22} /></span>
+    <div className="flex items-center gap-4 rounded-xl bg-white p-4 ring-1 ring-slate-200 transition hover:ring-brand-600/40 sm:p-5">
+      <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-lg ${tones[tone]}`}><Icon name={icon} size={22} /></span>
       <div className="min-w-0">
         <div className="text-2xl font-bold leading-none text-slate-900">{value}</div>
         <div className="mt-1 truncate text-sm text-slate-500">{label}</div>
@@ -177,11 +185,11 @@ export const inputCls =
 
 export const Button = ({ variant = 'primary', loading, className = '', children, type = 'button', ...p }) => {
   const v = {
-    primary: 'bg-brand-700 text-white shadow-sm hover:bg-brand-800',
+    primary: 'bg-brand-700 text-white hover:bg-brand-800',
     secondary: 'bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50',
-    danger: 'bg-red-600 text-white shadow-sm hover:bg-red-700',
+    danger: 'bg-red-600 text-white hover:bg-red-700',
     dangerOutline: 'bg-white text-red-600 ring-1 ring-red-300 hover:bg-red-50',
-    gold: 'bg-gold-500 text-brand-900 shadow-sm hover:bg-gold-400',
+    gold: 'bg-gold-500 text-brand-900 hover:bg-gold-400',
   }[variant];
   return (
     <button type={type} {...p} disabled={loading || p.disabled}
@@ -192,14 +200,14 @@ export const Button = ({ variant = 'primary', loading, className = '', children,
 };
 
 /* ---------- modal ---------- */
-export const Modal = ({ open, onClose, title, children, footer }) => {
+export const Modal = ({ open, onClose, title, children, footer, dismissible = true }) => {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-900/50 p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="pop w-full max-w-md rounded-2xl bg-white shadow-2xl" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-900/50 p-4" onMouseDown={(e) => dismissible && e.target === e.currentTarget && onClose()}>
+      <div className="pop w-full max-w-md rounded-xl bg-white shadow-xl" role="dialog" aria-modal="true">
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
           <h3 className="font-semibold text-slate-900">{title}</h3>
-          <button onClick={onClose} className="rounded p-1 text-slate-400 hover:bg-slate-100" aria-label="Close"><Icon name="x" size={18} /></button>
+          {dismissible && <button onClick={onClose} className="rounded p-1 text-slate-400 hover:bg-slate-100" aria-label="Close"><Icon name="x" size={18} /></button>}
         </div>
         <div className="px-5 py-4 text-sm text-slate-600">{children}</div>
         {footer && <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">{footer}</div>}
@@ -219,5 +227,48 @@ export const CopyChip = ({ text, className = '' }) => {
     <button type="button" onClick={copy} className={`inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 font-mono text-xs font-semibold text-slate-700 hover:bg-slate-200 ${className}`} title="Click to copy">
       {text}<Icon name={done ? 'check' : 'copy'} size={13} />
     </button>
+  );
+};
+
+/* ---------- image preview with a show / hide toggle ---------- */
+const IMAGE_EXT = /\.(jpe?g|png|webp|gif)(\?.*)?$/i;
+
+/**
+ * "Show preview / Hide preview" toggle for an uploaded image.
+ * Pass `file` (a File the user just picked) or `url` (an already uploaded file).
+ * Hidden by default; the preview expands when toggled on and collapses when toggled off.
+ * Non-image files (e.g. PDF) render nothing.
+ */
+export const ImagePreview = ({ file, url, label = 'preview', className = '' }) => {
+  const [open, setOpen] = useState(false);
+  const [broken, setBroken] = useState(false);
+  const isImage = file ? file.type.startsWith('image/') : !!url && IMAGE_EXT.test(url);
+  const objectUrl = useMemo(() => (file && isImage ? URL.createObjectURL(file) : null), [file, isImage]);
+  useEffect(() => () => { if (objectUrl) URL.revokeObjectURL(objectUrl); }, [objectUrl]);
+  useEffect(() => setBroken(false), [file, url]);
+
+  if (!isImage) return null;
+  const src = objectUrl || safeUrl(url);
+
+  return (
+    <div className={className}>
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open}
+        className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200">
+        <Icon name={open ? 'eyeOff' : 'eye'} size={14} />{open ? `Hide ${label}` : `Show ${label}`}
+      </button>
+      {/* grid-rows 0fr -> 1fr animates the collapse; the image is only requested once it is first shown */}
+      <div className={`grid transition-[grid-template-rows] duration-200 ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`} aria-hidden={!open}>
+        <div className="overflow-hidden">
+          {(open || src) && (
+            <div className="pt-2">
+              {broken
+                ? <p className="text-xs text-red-600">This image could not be loaded.</p>
+                : <img src={open ? src : undefined} alt="Uploaded file preview" onError={() => setBroken(true)}
+                    className="max-h-72 max-w-full rounded-lg bg-slate-50 object-contain ring-1 ring-slate-200" />}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 };

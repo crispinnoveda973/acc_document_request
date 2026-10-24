@@ -33,6 +33,10 @@ class StoreDocumentRequest extends FormRequest
     /** Normalize the reference first so the format and uniqueness checks compare the same value. */
     protected function prepareForValidation(): void
     {
+        // Cash is paid at the college office and recorded by the admin: no reference number / receipt.
+        if ($this->input('payment_method') === 'Cash') {
+            $this->request->remove('payment_reference');
+        }
         if ($this->filled('payment_reference')) {
             $this->merge(['payment_reference' => DocumentRequest::normalizeReference($this->input('payment_reference'))]);
         }

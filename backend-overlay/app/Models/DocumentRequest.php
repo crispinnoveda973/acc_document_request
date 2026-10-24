@@ -12,11 +12,13 @@ class DocumentRequest extends Model
 {
     use SoftDeletes;
 
-    public const READY = 'Ready for Pick-up';
+    public const READY = 'Ready to pick up';
     public const STATUSES = ['Pending', 'Under Review', 'Approved', 'Processing', self::READY, 'Completed', 'Rejected', 'Cancelled'];
     public const FINAL = ['Completed', 'Rejected', 'Cancelled'];
-    public const PAYMENT_METHODS = ['GCash', 'Bank Transfer'];
-    public const PAYMENT_STATUSES = ['Unpaid', 'For Verification', 'Verified'];
+    public const PAYMENT_METHODS = ['GCash', 'Bank Transfer', 'Cash'];
+    /** Methods the student pays online and the admin must check (reference no. / receipt). Cash is recorded by the admin at the office. */
+    public const ONLINE_METHODS = ['GCash', 'Bank Transfer'];
+    public const PAYMENT_STATUSES = ['Unpaid', 'Pending Verification', 'Verified', 'Rejected'];
     /** The document cannot be released (ready / completed) until a paid request has a verified payment. */
     public const NEEDS_VERIFIED_PAYMENT = [self::READY, 'Completed'];
 
@@ -24,7 +26,7 @@ class DocumentRequest extends Model
         'reference_number', 'transaction_number', 'student_id', 'document_type_id', 'copies', 'purpose',
         'preferred_claim_date', 'status', 'pickup_date', 'attachment_path', 'rejection_reason',
         'amount', 'payment_method', 'payment_reference', 'payment_proof_path', 'payment_status',
-        'payment_submitted_at', 'payment_verified_at', 'payment_verified_by',
+        'payment_submitted_at', 'payment_verified_at', 'payment_verified_by', 'payment_remarks',
         'pickup_by', 'representative_name', 'authorization_letter_path', 'processed_by',
     ];
     protected $casts = [
@@ -104,14 +106,13 @@ class DocumentRequest extends Model
      * $byAdmin = true  -> the student is notified.
      * $byAdmin = false -> the student did it (e.g. cancel) and the admins are notified instead.
      */
-    public function changeStatus(string $new, ?string $remarks, int $by, bool $byAdmin = true, ?string $pickupDate = null): void
+    public function changeStatus(string $new, ?string $remarks, int $by, bool $byAdmin = true): void
     {
-        DB::transaction(function () use ($new, $remarks, $by, $byAdmin, $pickupDate) {
+        DB::transaction(function () use ($new, $remarks, $by, $byAdmin) {
             $old = $this->status;
             $this->status = $new;
             if ($byAdmin) $this->processed_by = $by;
             if ($new === 'Rejected') $this->rejection_reason = $remarks;
-            if ($new === self::READY && $pickupDate) $this->pickup_date = $pickupDate;
             $this->save();
 
             $this->histories()->create([
@@ -119,8 +120,8 @@ class DocumentRequest extends Model
             ]);
 
             if ($byAdmin) {
-                $msg = $new === self::READY && $this->pickup_date
-                    ? "Your request {$this->reference_number} is ready for pick-up on ".$this->pickup_date->format('M d, Y').'.'
+                $msg = $new === self::READY
+                    ? "Your request {$this->reference_number} is ready to pick up."
                     : "Your request {$this->reference_number} is now: {$new}.";
                 $this->notifyStudent($msg);
             } else {

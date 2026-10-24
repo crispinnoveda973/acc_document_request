@@ -18,7 +18,7 @@ class DatabaseSeeder extends Seeder
         // Default site content. The admin can edit all of this under "Site Settings".
         $defaults = [
             'about_text' => "Abuyog Community College (ACC) is a local college in Abuyog, Leyte, Philippines. "
-                ."This portal lets students request official school documents online, pay through GCash or bank transfer, "
+                ."This portal lets students request official school documents online, pay through GCash, bank transfer or cash, "
                 ."track the progress of every request, and know exactly when and how to claim their documents.",
             'address' => 'Abuyog, Leyte, Philippines',
             'contact_email' => '',
@@ -26,9 +26,9 @@ class DatabaseSeeder extends Seeder
             'office_hours' => 'Monday to Friday, 8:00 AM - 5:00 PM',
             'claim_steps' => implode("\n", [
                 'Submit your request online and keep your transaction number.',
-                'Pay the fee through GCash or bank transfer, then send your payment reference number or receipt.',
+                'Pay the fee through GCash or bank transfer and send your reference number or receipt, or pay in cash at the college office. The admin confirms every payment.',
                 'Wait for the admin to approve your request and verify your payment. You will get a notification.',
-                'When the status becomes "Ready for Pick-up", check the pick-up date shown on your request.',
+                'When the status becomes "Ready to pick up", go to the college office to claim your document.',
                 'Go to the college office during office hours and present your transaction number and a valid ID.',
                 'If someone else will claim the document for you, they must bring your signed authorization letter.',
             ]),
@@ -64,13 +64,17 @@ class DatabaseSeeder extends Seeder
         // [student, type, status, payment method, payment status, pickup_by]
         $samples = [
             [0, 0, 'Pending', 'GCash', 'Unpaid', 'self'],
-            [0, 3, 'Under Review', 'Bank Transfer', 'For Verification', 'self'],
+            [0, 3, 'Under Review', 'Bank Transfer', 'Pending Verification', 'self'],
             [1, 1, 'Approved', 'GCash', 'Verified', 'self'],
-            [1, 4, 'Ready for Pick-up', 'GCash', 'Verified', 'representative'],
+            [1, 4, 'Ready to pick up', 'GCash', 'Verified', 'representative'],
             [2, 2, 'Completed', 'Bank Transfer', 'Verified', 'self'],
             [2, 5, 'Rejected', 'GCash', 'Unpaid', 'self'],
+            [0, 1, 'Pending', 'Cash', 'Unpaid', 'self'],
+            [1, 2, 'Approved', 'GCash', 'Rejected', 'self'],
         ];
-        foreach ($samples as [$si, $ti, $status, $method, $pay, $by]) {
+        // Spread the sample requests over the last weeks so the day / week / month reports have something to show.
+        $daysAgo = [0, 0, 1, 2, 4, 8, 15, 25];
+        foreach ($samples as $i => [$si, $ti, $status, $method, $pay, $by]) {
             $req = DocumentRequest::create([
                 'reference_number' => DocumentRequest::nextReference(),
                 'transaction_number' => DocumentRequest::nextTransaction(),
@@ -78,22 +82,19 @@ class DatabaseSeeder extends Seeder
                 'copies' => 1, 'purpose' => 'Employment / scholarship requirement',
                 'preferred_claim_date' => now()->addDays(7)->toDateString(), 'status' => 'Pending',
                 'amount' => $types[$ti]->fee, 'payment_method' => $method,
-                // Realistic sample references that pass the app's validation (GCash: digits, bank: letters/digits).
-                'payment_reference' => $pay === 'Unpaid' ? null : ($method === 'GCash' ? (string) random_int(1000000000000, 9999999999999) : 'TRF'.random_int(10000000, 99999999)),
+                // Realistic sample references that pass the app's validation (GCash: digits, bank: letters/digits). Cash has none.
+                'payment_reference' => in_array($pay, ['Unpaid']) || $method === 'Cash' ? null : ($method === 'GCash' ? (string) random_int(1000000000000, 9999999999999) : 'TRF'.random_int(10000000, 99999999)),
+                'payment_remarks' => $pay === 'Rejected' ? 'Reference number not found in our records.' : null,
                 'payment_status' => $pay,
-                'payment_submitted_at' => $pay === 'Unpaid' ? null : now(),
+                'payment_submitted_at' => in_array($pay, ['Unpaid']) || $method === 'Cash' ? null : now(),
                 'payment_verified_at' => $pay === 'Verified' ? now() : null,
                 'payment_verified_by' => $pay === 'Verified' ? $admin->id : null,
                 'pickup_by' => $by, 'representative_name' => $by === 'representative' ? 'Maria Reyes' : null,
             ]);
+            if ($daysAgo[$i]) $req->forceFill(['created_at' => now()->subDays($daysAgo[$i])])->saveQuietly();
             $req->histories()->create(['new_status' => 'Pending', 'remarks' => 'Request submitted.', 'changed_by' => $made[$si]->user_id]);
             if ($status !== 'Pending') {
-                $req->changeStatus(
-                    $status,
-                    $status === 'Rejected' ? 'Incomplete supporting documents.' : null,
-                    $admin->id, true,
-                    $status === 'Ready for Pick-up' ? now()->addDays(3)->toDateString() : null
-                );
+                $req->changeStatus($status, $status === 'Rejected' ? 'Incomplete supporting documents.' : null, $admin->id, true);
             }
         }
     }

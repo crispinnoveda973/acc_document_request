@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import api, { FINAL, READY, errMsg, fmt, fmtDate, peso } from '../../api';
+import api, { FINAL, READY, errMsg, fmt, peso } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
@@ -49,15 +49,15 @@ export default function StudentDashboard() {
       </section>
 
       {ready.length > 0 && (
-        <Notice tone="ok" title={`${ready.length} document${ready.length > 1 ? 's are' : ' is'} ready for pick-up!`}>
-          {ready.map((r) => <div key={r.id}>{r.document_type?.name} — pick-up on <b>{fmtDate(r.pickup_date)}</b> (<Link className="underline" to={`/requests/${r.id}`}>{r.transaction_number}</Link>)</div>)}
+        <Notice tone="ok" title="Ready to pick up.">
+          {ready.map((r) => <div key={r.id}>{r.document_type?.name} (<Link className="underline" to={`/requests/${r.id}`}>{r.transaction_number}</Link>)</div>)}
         </Notice>
       )}
 
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         <StatCard label="Total requests" value={items ? items.length : '–'} icon="file" />
         <StatCard label="In progress" value={items ? count((r) => !FINAL.includes(r.status) && r.status !== READY) : '–'} icon="clock" tone="amber" />
-        <StatCard label="Ready for pick-up" value={items ? ready.length : '–'} icon="check" tone="teal" />
+        <StatCard label="Ready to pick up" value={items ? ready.length : '–'} icon="check" tone="teal" />
         <StatCard label="Completed" value={items ? count((r) => r.status === 'Completed') : '–'} icon="check" tone="sky" />
       </div>
 
@@ -78,7 +78,7 @@ export default function StudentDashboard() {
                       <td className="font-medium text-slate-900">{r.document_type?.name}<div className="text-xs font-normal text-slate-500">{r.copies} {r.copies > 1 ? 'copies' : 'copy'}</div></td>
                       <td className="whitespace-nowrap">{peso(r.amount)}</td>
                       <td><StatusBadge status={r.payment_status} /></td>
-                      <td><StatusBadge status={r.status} />{r.status === READY && r.pickup_date && <div className="mt-1 text-xs text-teal-700">{fmtDate(r.pickup_date)}</div>}</td>
+                      <td><StatusBadge status={r.status} /></td>
                       <td className="whitespace-nowrap text-slate-500">{fmt(r.created_at)}</td>
                       <td className="space-x-2 whitespace-nowrap pr-5 text-right">
                         <Link to={`/requests/${r.id}`} className="rounded-lg bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-100">View</Link>

@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import api, { FINAL, NEEDS_VERIFIED_PAYMENT, PAYMENT_METHODS, READY, REF_RULES, STATUSES, errMsg, fieldErrors, fmt, fmtDate, peso, refError, today } from '../api';
+import api, { FINAL, NEEDS_VERIFIED_PAYMENT, ONLINE_METHODS, READY, REF_RULES, STATUSES, errMsg, fieldErrors, fmt, fmtDate, peso, refError, safeUrl } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import useSettings from '../useSettings';
 import { PaymentInstructions } from './student/NewRequest';
-import { Avatar, Button, Card, CopyChip, Field, Icon, Notice, Row, Spinner, StatusBadge, inputCls } from '../components/ui';
+import { Avatar, Button, Card, CopyChip, Field, Icon, ImagePreview, Notice, Row, Spinner, StatusBadge, inputCls } from '../components/ui';
 
 const FileLink = ({ url, label = 'Open file' }) =>
-  url ? <a className="font-semibold text-brand-700 underline" href={url} target="_blank" rel="noreferrer">{label}</a> : 'None';
+  url ? (
+    <div className="flex flex-col items-end gap-1.5">
+      <a className="font-semibold text-brand-700 underline" href={safeUrl(url)} target="_blank" rel="noopener noreferrer">{label}</a>
+      <ImagePreview url={url} label="preview" className="flex flex-col items-end" />
+    </div>
+  ) : 'None';
 
 export default function RequestDetail() {
   const { id } = useParams();
@@ -24,18 +29,18 @@ export default function RequestDetail() {
 
   const [req, setReq] = useState(null);
   const [status, setStatus] = useState('');
-  const [pickupDate, setPickupDate] = useState('');
   const [remarks, setRemarks] = useState('');
   const [edit, setEdit] = useState(null);
   const [busy, setBusy] = useState(false);
   const [pay, setPay] = useState({ payment_method: 'GCash', payment_reference: '', file: null });
+  const [rejectReason, setRejectReason] = useState('');
+  const [payOnline, setPayOnline] = useState(false);   // a student who chose Cash can still switch to GCash / bank
   const [payErr, setPayErr] = useState({});
 
   const load = () =>
     api.get(`${base}/${id}`).then((r) => {
       setReq(r.data.data);
-      setPickupDate(r.data.data.pickup_date || '');
-      setPay((p) => ({ ...p, payment_method: r.data.data.payment_method || 'GCash' }));
+      setPay((p) => ({ ...p, payment_method: ONLINE_METHODS.includes(r.data.data.payment_method) ? r.data.data.payment_method : 'GCash' }));
     }).catch((e) => { toast(errMsg(e), 'error'); nav('/'); });
   useEffect(() => { load(); }, [id]);
 
@@ -49,13 +54,16 @@ export default function RequestDetail() {
   if (!req) return <Spinner />;
   const final = FINAL.includes(req.status);
   const trashed = !!req.deleted_at;
-  const needsDate = status === READY;
+  const cash = req.payment_method === 'Cash';
 
-  const setTo = async (s, date) => {
+  const setTo = async (s) => {
     if (s === 'Rejected' && !remarks.trim()) return toast('Please enter a reason for rejection in the remarks box.', 'error');
-    if (s === READY && !date) return toast('Please choose the pick-up date first.', 'error');
-    const body = { status: s, remarks, ...(s === READY ? { pickup_date: date } : {}) };
-    if (await run(() => api.patch(`${base}/${id}/status`, body), s === READY ? 'Marked ready for pick-up.' : `Status updated to ${s}.`)) { setRemarks(''); setStatus(''); }
+    if (await run(() => api.patch(`${base}/${id}/status`, { status: s, remarks }), s === READY ? 'Marked as ready to pick up.' : `Status updated to ${s}.`)) { setRemarks(''); setStatus(''); }
+  };
+
+  const decidePayment = async (payment_status, okMsg) => {
+    if (payment_status === 'Rejected' && !rejectReason.trim()) return toast('Please enter the reason the payment is rejected.', 'error');
+    if (await run(() => api.patch(`${base}/${id}/payment`, { payment_status, remarks: rejectReason.trim() || undefined }), okMsg)) setRejectReason('');
   };
 
   const cancel = async () => {
@@ -70,6 +78,7 @@ export default function RequestDetail() {
     e.preventDefault(); setPayErr({});
     // Check the reference format before sending (the API checks it again).
     const refProblem = refError(pay.payment_method, pay.payment_reference);
+    if (!pay.payment_reference && !pay.file) { setPayErr({ payment_reference: 'Enter your payment reference number or upload your receipt.' }); return toast('Enter your payment reference number or upload your receipt.', 'error'); }
     if (refProblem) { setPayErr({ payment_reference: refProblem }); return toast(refProblem, 'error'); }
     const fd = new FormData();
     fd.append('payment_method', pay.payment_method);
@@ -81,7 +90,7 @@ export default function RequestDetail() {
     finally { setBusy(false); }
   };
 
-  const canPay = !isAdmin && !final && req.payment_status !== 'Verified';
+  const canPay = !isAdmin && !final && req.payment_status !== 'Verified' && (!cash || payOnline);
   // Paid documents cannot be released (ready / completed) until the payment is verified; the API enforces this too.
   const blockedByPayment = NEEDS_VERIFIED_PAYMENT.includes(status) && Number(req.amount) > 0 && req.payment_status !== 'Verified';
 
@@ -112,9 +121,9 @@ export default function RequestDetail() {
       )}
       {req.status === 'Rejected' && req.rejection_reason && <Notice tone="bad" title="Request rejected">{req.rejection_reason}</Notice>}
       {req.status === READY && (
-        <Notice tone="ok" title={`Ready for pick-up on ${fmtDate(req.pickup_date)}`}>
-          {settings?.office_hours && <>Office hours: {settings.office_hours}. </>}Bring your transaction number{req.pickup_by === 'self' ? ' and a valid ID.' : ', a valid ID, and the signed authorization letter.'}
-          {' '}<Link to="/how-to-claim" className="font-semibold underline">How to claim</Link>
+        <Notice tone="ok" title="Ready to pick up.">
+          {!isAdmin && <>{settings?.office_hours && <>Office hours: {settings.office_hours}. </>}Bring your transaction number{req.pickup_by === 'self' ? ' and a valid ID.' : ', a valid ID, and the signed authorization letter.'}
+          {' '}<Link to="/how-to-claim" className="font-semibold underline">How to claim</Link></>}
         </Notice>
       )}
 
@@ -136,7 +145,6 @@ export default function RequestDetail() {
               <Row k="Total amount" v={<span className="text-brand-700">{peso(req.amount)}</span>} />
               <Row k="Purpose" v={req.purpose} />
               <Row k="Preferred claim date" v={fmtDate(req.preferred_claim_date)} />
-              {req.pickup_date && <Row k="Pick-up date" v={<span className="text-teal-700">{fmtDate(req.pickup_date)}</span>} />}
               <Row k="Submitted" v={fmt(req.created_at)} />
               <Row k="Processed by" v={req.processor} />
               <Row k="Attachment" v={<FileLink url={req.attachment_url} />} />
@@ -148,43 +156,70 @@ export default function RequestDetail() {
             <Row k="Amount to pay" v={peso(req.amount)} />
             <Row k="Reference no." v={req.payment_reference} />
             <Row k="Receipt / proof" v={<FileLink url={req.payment_proof_url} label="View receipt" />} />
-            {req.payment_submitted_at && <Row k="Details sent" v={fmt(req.payment_submitted_at)} />}
-            {req.payment_verified_at && <Row k="Verified" v={`${fmt(req.payment_verified_at)}${req.payment_verified_by ? ` by ${req.payment_verified_by}` : ''}`} />}
+            {!cash && req.payment_submitted_at && <Row k="Details sent" v={fmt(req.payment_submitted_at)} />}
+            {req.payment_verified_at && <Row k={cash ? 'Cash recorded' : 'Verified'} v={`${fmt(req.payment_verified_at)}${req.payment_verified_by ? ` by ${req.payment_verified_by}` : ''}`} />}
+            {req.payment_status === 'Rejected' && <Row k="Rejection reason" v={req.payment_remarks} />}
 
             {!isAdmin && !final && (
               <div className="mt-3">
-                {req.payment_status === 'Unpaid' && <Notice tone="warn" title="Payment needed">Pay {peso(req.amount)} then send your reference number or receipt below.</Notice>}
-                {req.payment_status === 'For Verification' && <Notice tone="info" title="Payment received">The admin is checking your payment. You will be notified once it is verified.</Notice>}
-                {req.payment_status === 'Verified' && <Notice tone="ok" title="Payment verified">Thank you! Your payment has been confirmed.</Notice>}
+                {req.payment_status === 'Unpaid' && cash && !payOnline && (
+                  <Notice tone="warn" title="Pay in cash at the college office">
+                    Pay {peso(req.amount)} at the office{settings?.office_hours ? ` (${settings.office_hours})` : ''}. The admin will record your payment.
+                    {' '}<button type="button" className="font-semibold underline" onClick={() => setPayOnline(true)}>Pay with GCash / bank transfer instead</button>
+                  </Notice>
+                )}
+                {req.payment_status === 'Unpaid' && !cash && <Notice tone="warn" title="Payment needed">Pay {peso(req.amount)} then send your reference number or receipt below.</Notice>}
+                {req.payment_status === 'Pending Verification' && <Notice tone="info" title="Pending verification">The admin is checking your payment. You will be notified once it is verified.</Notice>}
+                {req.payment_status === 'Rejected' && <Notice tone="bad" title="Payment rejected">{req.payment_remarks ? `${req.payment_remarks} ` : ''}Please check your details and send them again below.</Notice>}
+                {req.payment_status === 'Verified' && <Notice tone="ok" title={cash ? 'Cash payment recorded' : 'Payment verified'}>Thank you! Your payment has been confirmed.</Notice>}
               </div>
             )}
-            {isAdmin && !final && !trashed && req.payment_status === 'Unpaid' && (
-              <div className="mt-3"><Notice tone="warn">The student has not sent any payment details yet, so there is nothing to verify.</Notice></div>
+            {isAdmin && !final && !trashed && !cash && ['Unpaid', 'Rejected'].includes(req.payment_status) && (
+              <div className="mt-3"><Notice tone="warn">{req.payment_status === 'Rejected' ? 'You rejected this payment. Waiting for the student to send new payment details.' : 'The student has not sent any payment details yet, so there is nothing to verify.'}</Notice></div>
+            )}
+            {isAdmin && !final && !trashed && cash && req.payment_status !== 'Verified' && (
+              <div className="mt-3"><Notice tone="info">Cash is paid at the college office. Click “Record cash payment” once you have received {peso(req.amount)}.</Notice></div>
             )}
 
-            {isAdmin && !final && !trashed && (
+            {isAdmin && !final && !trashed && cash && (
               <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
-                <Button disabled={busy || req.payment_status !== 'For Verification'} onClick={() => run(() => api.patch(`${base}/${id}/payment`, { payment_status: 'Verified' }), 'Payment verified.')}>
-                  <Icon name="check" size={16} />Verify payment
-                </Button>
-                <Button variant="dangerOutline" disabled={busy || req.payment_status === 'Unpaid'} onClick={() => run(() => api.patch(`${base}/${id}/payment`, { payment_status: 'Unpaid', remarks: remarks || undefined }), 'Marked as unpaid.')}>
-                  Payment not received
-                </Button>
+                {req.payment_status !== 'Verified'
+                  ? <Button disabled={busy} onClick={() => decidePayment('Verified', 'Cash payment recorded.')}><Icon name="check" size={16} />Record cash payment</Button>
+                  : <Button variant="dangerOutline" disabled={busy} onClick={() => decidePayment('Unpaid', 'Cash record removed.')}>Undo cash record</Button>}
+              </div>
+            )}
+
+            {isAdmin && !final && !trashed && !cash && (
+              <div className="mt-4 space-y-3 border-t pt-4">
+                <Field label="Reason (required to reject a payment)">
+                  <input className={inputCls} value={rejectReason} maxLength="500" onChange={(e) => setRejectReason(e.target.value)} placeholder="e.g. Reference number not found, wrong amount" />
+                </Field>
+                <div className="flex flex-wrap gap-2">
+                  <Button disabled={busy || req.payment_status !== 'Pending Verification'} onClick={() => decidePayment('Verified', 'Payment verified.')}>
+                    <Icon name="check" size={16} />Verify payment
+                  </Button>
+                  <Button variant="dangerOutline" disabled={busy || !['Pending Verification', 'Verified'].includes(req.payment_status)} onClick={() => decidePayment('Rejected', 'Payment rejected.')}>
+                    Reject payment
+                  </Button>
+                </div>
               </div>
             )}
 
             {canPay && (
               <form onSubmit={sendPayment} className="mt-4 space-y-3 border-t pt-4">
-                <p className="text-sm font-semibold text-slate-900">{req.payment_status === 'For Verification' ? 'Update your payment details' : 'Send your payment details'}</p>
+                <p className="text-sm font-semibold text-slate-900">{req.payment_status === 'Pending Verification' ? 'Update your payment details' : 'Send your payment details'}</p>
                 <Field label="Payment method" error={payErr.payment_method}>
                   <select className={inputCls} value={pay.payment_method} onChange={(e) => setPay({ ...pay, payment_method: e.target.value })}>
-                    {PAYMENT_METHODS.map((m) => <option key={m}>{m}</option>)}
+                    {ONLINE_METHODS.map((m) => <option key={m}>{m}</option>)}
                   </select>
                 </Field>
                 <PaymentInstructions method={pay.payment_method} s={settings} amount={req.amount} />
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="Payment reference no." error={payErr.payment_reference} hint={REF_RULES[pay.payment_method].hint}><input className={inputCls} value={pay.payment_reference} onChange={(e) => setPay({ ...pay, payment_reference: e.target.value })} maxLength="80" inputMode={pay.payment_method === 'GCash' ? 'numeric' : 'text'} /></Field>
-                  <Field label="Receipt / screenshot" error={payErr.payment_proof}><input type="file" accept=".pdf,.jpg,.jpeg,.png" className={inputCls} onChange={(e) => setPay({ ...pay, file: e.target.files[0] || null })} /></Field>
+                  <div className="space-y-2">
+                    <Field label="Receipt / screenshot" error={payErr.payment_proof}><input type="file" accept=".pdf,.jpg,.jpeg,.png" className={inputCls} onChange={(e) => setPay({ ...pay, file: e.target.files[0] || null })} /></Field>
+                    <ImagePreview file={pay.file} label="receipt preview" />
+                  </div>
                 </div>
                 <Button type="submit" loading={busy}>Send payment details</Button>
               </form>
@@ -248,26 +283,15 @@ export default function RequestDetail() {
                     </select>
                   </Field>
                 )}
-                {blockedByPayment && <Notice tone="warn">Verify the student's payment first — a paid document cannot be marked “{status}” before that.</Notice>}
-                {needsDate && (
-                  <Field label="Pick-up date (required)" hint="The student is notified of this date.">
-                    <input type="date" min={today()} className={inputCls} value={pickupDate} onChange={(e) => setPickupDate(e.target.value)} />
-                  </Field>
-                )}
+                {blockedByPayment && <Notice tone="warn">Confirm the student's payment first — a paid document cannot be marked “{status}” before that.</Notice>}
                 <Field label={`Remarks${status === 'Rejected' ? ' (required)' : ''}`}>
                   <textarea rows="3" className={inputCls} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
                 </Field>
                 {!final && (
                   <div className="flex flex-wrap gap-2">
-                    <Button loading={busy} disabled={!status || blockedByPayment} onClick={() => setTo(status, pickupDate)}>Update status</Button>
+                    <Button loading={busy} disabled={!status || blockedByPayment} onClick={() => setTo(status)}>Update status</Button>
                     {req.status === 'Pending' && <Button variant="secondary" disabled={busy} onClick={() => setTo('Approved')}>Approve</Button>}
                     <Button variant="dangerOutline" disabled={busy} onClick={() => setTo('Rejected')}>Reject</Button>
-                  </div>
-                )}
-                {req.status === READY && (
-                  <div className="space-y-2 rounded-xl bg-teal-50 p-3 ring-1 ring-teal-200">
-                    <Field label="Change pick-up date"><input type="date" min={today()} className={inputCls} value={pickupDate} onChange={(e) => setPickupDate(e.target.value)} /></Field>
-                    <Button variant="secondary" disabled={busy || !pickupDate || pickupDate === req.pickup_date} onClick={() => setTo(READY, pickupDate)}>Save new date</Button>
                   </div>
                 )}
                 <Button variant="secondary" disabled={!remarks.trim() || busy}

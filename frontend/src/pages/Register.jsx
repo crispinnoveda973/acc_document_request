@@ -43,7 +43,7 @@ export default function Register() {
           <Field label="Year Level" error={errors.year_level}>
             <select className={inputCls} value={f.year_level} onChange={set('year_level')}>{YEARS.map((y) => <option key={y}>{y}</option>)}</select>
           </Field>
-          <Field label="Password (min 8)" error={errors.password}><input type="password" className={inputCls} value={f.password} onChange={set('password')} required /></Field>
+          <Field label="Password (min 8, letters + numbers)" error={errors.password}><input type="password" className={inputCls} value={f.password} onChange={set('password')} required /></Field>
           <Field label="Confirm Password"><input type="password" className={inputCls} value={f.password_confirmation} onChange={set('password_confirmation')} required /></Field>
         </div>
         <Button type="submit" loading={busy} className="w-full py-3">Create account</Button>

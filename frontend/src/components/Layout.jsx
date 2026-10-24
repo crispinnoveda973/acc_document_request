@@ -4,6 +4,7 @@ import api, { fmt } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { Avatar, Icon, Logo } from './ui';
+import YearLevelPrompt from './YearLevelPrompt';
 
 function Bell() {
   const { user } = useAuth();
@@ -69,14 +70,14 @@ export default function Layout() {
 
   const isAdmin = user.role === 'admin';
   const links = isAdmin
-    ? [['/', 'Dashboard', 'home'], ['/requests', 'All Requests', 'file'], ['/students', 'Students', 'users'], ['/document-types', 'Document Types', 'tag'], ['/how-to-claim', 'How to Claim', 'steps'], ['/settings', 'Site Settings', 'settings'], ['/about', 'About ACC', 'info'], ['/profile', 'My Profile', 'user']]
+    ? [['/', 'Dashboard', 'home'], ['/requests', 'All Requests', 'file'], ['/reports', 'Reports', 'chart'], ['/students', 'Students', 'users'], ['/document-types', 'Document Types', 'tag'], ['/how-to-claim', 'How to Claim', 'steps'], ['/settings', 'Site Settings', 'settings'], ['/about', 'About ACC', 'info'], ['/profile', 'My Profile', 'user']]
     : [['/', 'My Requests', 'home'], ['/new', 'New Request', 'plus'], ['/how-to-claim', 'How to Claim', 'steps'], ['/about', 'About ACC', 'info'], ['/profile', 'My Profile', 'user']];
 
   const cls = ({ isActive }) =>
-    `flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition ${isActive ? 'bg-white text-brand-800 shadow' : 'text-white/80 hover:bg-white/10 hover:text-white'}`;
+    `flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition ${isActive ? 'bg-white/15 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'}`;
 
   const Sidebar = (
-    <div className="flex h-full flex-col bg-gradient-to-b from-brand-800 to-brand-900 text-white">
+    <div className="flex h-full flex-col bg-brand-900 text-white">
       <Link to="/" className="flex items-center gap-3 px-5 py-5">
         <Logo size={44} />
         <span className="leading-tight">
@@ -107,7 +108,7 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen lg:pl-64">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 lg:block">{Sidebar}</aside>
+      <aside className="no-print fixed inset-y-0 left-0 z-30 hidden w-64 lg:block">{Sidebar}</aside>
 
       {drawer && (
         <div className="fixed inset-0 z-50 lg:hidden">
@@ -116,7 +117,7 @@ export default function Layout() {
         </div>
       )}
 
-      <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/90 px-4 py-2.5 backdrop-blur sm:px-6 lg:px-8">
+      <header className="no-print sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-2.5 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
           <button className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden" onClick={() => setDrawer(true)} aria-label="Menu"><Icon name="menu" /></button>
           <span className="text-sm font-semibold text-brand-800 lg:hidden">ACC Document Request</span>
@@ -125,8 +126,9 @@ export default function Layout() {
         <Bell />
       </header>
 
-      <main className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8"><Outlet /></main>
-      <footer className="px-4 pb-6 text-center text-xs text-slate-400">© {new Date().getFullYear()} Abuyog Community College · Student Document Request System</footer>
+      {!isAdmin && <YearLevelPrompt />}
+      <main className="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8"><Outlet /></main>
+      <footer className="no-print px-4 pb-6 text-center text-xs text-slate-400">© {new Date().getFullYear()} Abuyog Community College · Student Document Request System</footer>
     </div>
   );
 }
