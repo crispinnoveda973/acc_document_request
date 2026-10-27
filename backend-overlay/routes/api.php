@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AdminRequestController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ChatbotController;
 use App\Http\Controllers\Api\DocumentTypeController;
 use App\Http\Controllers\Api\NoticeController;
 use App\Http\Controllers\Api\ReportController;
@@ -27,6 +28,9 @@ Route::middleware(['auth:sanctum', 'throttle:120,1'])->group(function () {
     Route::get('/settings', [SettingsController::class, 'index']);
     Route::get('/notices', [NoticeController::class, 'index']);
     Route::post('/notices/read', [NoticeController::class, 'markAllRead']);
+
+    // ACC Assistant (chatbot) - students and admins; 30 questions per minute per user.
+    Route::post('/chatbot', [ChatbotController::class, 'ask'])->middleware('throttle:30,1');
 
     // ---- Student (the "user") ----
     Route::middleware('role:student')->prefix('student')->group(function () {

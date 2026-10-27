@@ -244,10 +244,46 @@ Known limit: the login token is kept in `localStorage` (normal for a token-based
 
 **Quick security tests**: search `' OR 1=1 --` or `%` in All Requests (no extra rows, no error); register with the name `<script>alert(1)</script>` or `<img src=x onerror=alert(1)>` (saved without the tags, nothing pops up); a purpose of `<b>hi</b>` is stored as `hi`.
 
-## Tests
+## Tests (also: `php artisan test --filter=ChatbotTest` for the chatbot)
 `php artisan test --filter=YearLevelPromptTest` checks the yearly question (2026-2027 -> "Are you now a 3rd year level?" for a 2nd year, 2027-2028 -> 4th, never twice in one school year, never for 5th year).
 
 ## UI clean-up in this version
 Table cells have even spacing on every page, flat white cards with a thin border (no heavy shadows), a solid sidebar with a quieter active item, a plain header, softer page background, visible keyboard focus, print styles, and the Year Level in *My Profile* is now a dropdown.
 
 > **Upgrading?** Copy `backend-overlay/*` over `backend/` (this adds the middleware, `Support/Search.php`, `ReportController`, the test), copy the `frontend/` files, run `php artisan config:clear`, `npm install`, `npm run dev`. No new migration is needed.
+
+## ACC Assistant (chatbot) — new in this version
+A round chat button at the bottom-right of every page (students **and** admins) opens the **ACC Assistant**.
+It needs **no API key, no extra package and no new table** — it is a rule-based assistant that answers from the system's own live data,
+so when the admin changes a fee, an office hour or the claim steps, the chatbot answers with the new value straight away.
+
+**What students can ask** (English, with a few common Filipino words such as *magkano*, *paano magbayad*, *salamat*):
+- Documents, fees and processing time — "What documents can I request?", "How much is the Transcript of Records?", "magkano ang TOR" (short forms *TOR, COE, COG, GMC* work)
+- How to request a document, how to pay (GCash / Bank Transfer / Cash, with the account details from **Site Settings**), what *Pending Verification* / *Rejected* mean
+- How to claim a document, authorization letters, office hours / address / phone / email
+- "Track my requests" (their latest 5), or a **reference number** (`ACC-2026-00001`) / **transaction number** (`TXN-20261007-K7Q2ZP`) for full details and a next-step hint
+- What each status means, how to cancel (only while *Pending*), profile picture / password help
+
+**What admins can ask:** "Request summary" (today, pending, under review, ready, payments to verify, total), "Payments to verify",
+how to verify a payment, and any request by reference or transaction number.
+
+**Security / privacy**
+- A student can only look up **their own** requests (another student's number answers "not found"); admins can look up any request.
+- Login is required; limit of 30 questions per minute per user; question length max 300 characters.
+- The text is cleaned by `SanitizeInput` like every other input, is never echoed back or put into SQL (Eloquent bound parameters only), and the reply is plain text that React escapes. Links in a reply must be internal paths (`/requests/12`).
+
+**Files**
+| File | What it does |
+|------|--------------|
+| `backend-overlay/app/Support/Chatbot.php` | All the logic: keyword table (`INTENTS`), answers, request lookup |
+| `backend-overlay/app/Http/Controllers/Api/ChatbotController.php` | `POST /api/chatbot` `{ "message": "..." }` → `{ data: { reply, links, suggestions } }` |
+| `backend-overlay/routes/api.php` | the new `/chatbot` route |
+| `backend-overlay/tests/Unit/ChatbotTest.php` | `php artisan test --filter=ChatbotTest` |
+| `frontend/src/components/ChatBot.jsx` | the chat window; mounted once in `Layout.jsx` |
+| `frontend/src/components/ui.jsx` | three new icons (`chat`, `send`, `refresh`) |
+
+**Teach it something new:** open `app/Support/Chatbot.php`, add words to an intent in `INTENTS`
+(`pay*` = starts with, `word=3` = heavier weight; if two topics tie, the one listed first wins), or add a new answer method and a line in the `match` in `reply()`.
+
+> **Upgrading from v3?** Copy `backend-overlay/*` over your `backend/` folder and the `frontend/` files over your frontend, then run
+> `php artisan route:clear` (only needed if routes were cached) and `npm run dev`. **No migration and no new npm package is needed.**

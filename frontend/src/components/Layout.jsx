@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { Avatar, Icon, Logo } from './ui';
 import YearLevelPrompt from './YearLevelPrompt';
+import ChatBot from './ChatBot';
 
 function Bell() {
   const { user } = useAuth();
@@ -129,6 +130,7 @@ export default function Layout() {
       {!isAdmin && <YearLevelPrompt />}
       <main className="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8"><Outlet /></main>
       <footer className="no-print px-4 pb-6 text-center text-xs text-slate-400">© {new Date().getFullYear()} Abuyog Community College · Student Document Request System</footer>
+      <ChatBot />
     </div>
   );
 }
